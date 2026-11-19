@@ -48,7 +48,7 @@ export async function createCashfreeOrder(
     customer_details: {
       customer_id: (input.customer.id || "guest").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 50) || "guest",
       customer_name: input.customer.name.slice(0, 100),
-      customer_email: (input.customer.email || "orders@kokanproducts.com").slice(0, 100),
+      customer_email: (input.customer.email || "orders@konkanproducts.com").slice(0, 100),
       customer_phone: normalizePhone(input.customer.phone),
     },
     order_meta: {
@@ -57,7 +57,7 @@ export async function createCashfreeOrder(
         : `${input.returnUrl}${input.returnUrl.includes("?") ? "&" : "?"}order_id={order_id}`,
       ...(input.notifyUrl ? { notify_url: input.notifyUrl } : {}),
     },
-    order_note: "KokanProducts order",
+    order_note: "KonkanProducts order",
   };
 
   const res = await fetch(`${base}/orders`, {

@@ -117,7 +117,7 @@ export function ProductsClient() {
             onChange={(e) => setParam("fulfillment", e.target.value)}
           >
             <option value="">Any</option>
-            <option value="internal">KokanProducts stock</option>
+            <option value="internal">KonkanProducts stock</option>
             <option value="seller">Seller dispatch</option>
           </select>
         </label>

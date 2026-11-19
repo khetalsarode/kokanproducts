@@ -27,7 +27,7 @@ export default function HomePage() {
           <p className="reveal text-xs uppercase tracking-[0.28em] text-mango">
             Direct from the Konkan coast
           </p>
-          <h1 className="reveal reveal-delay-1 sr-only">KokanProducts</h1>
+          <h1 className="reveal reveal-delay-1 sr-only">KonkanProducts</h1>
           <p className="reveal reveal-delay-2 mt-4 max-w-md text-base text-foam/80 sm:text-lg">
             Authentic Konkan food — kokum, hapus, cashews & coconut — packed at source and shipped to your kitchen.
           </p>
@@ -104,7 +104,7 @@ export default function HomePage() {
         </div>
         <div className="section relative grid gap-8 md:grid-cols-[1.2fr_1fr] md:items-center">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-mango">Why KokanProducts</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-mango">Why KonkanProducts</p>
             <h2 className="mt-2 font-display text-3xl sm:text-4xl">
               Good food. Local farmers. Sustainable future.
             </h2>

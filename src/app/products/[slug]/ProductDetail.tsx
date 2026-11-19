@@ -117,7 +117,7 @@ export function ProductDetail({
               <span className="text-ink/50">Fulfilment </span>
               <strong>
                 {product.fulfillment === "internal"
-                  ? "KokanProducts stock — we pack & ship"
+                  ? "KonkanProducts stock — we pack & ship"
                   : "Third-party seller dispatch"}
               </strong>
             </p>

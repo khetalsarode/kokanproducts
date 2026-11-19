@@ -20,7 +20,7 @@ export function BrandLogo({
     <Link
       href={href}
       className="group inline-flex items-center gap-2"
-      aria-label="KokanProducts home"
+      aria-label="KonkanProducts home"
     >
       <span
         className="relative shrink-0 overflow-hidden rounded-full ring-1 ring-sea/15 bg-white/90"
@@ -41,7 +41,7 @@ export function BrandLogo({
             light ? "text-foam" : "text-sea"
           } group-hover:opacity-90`}
         >
-          KokanProducts
+          KonkanProducts
         </span>
       )}
     </Link>

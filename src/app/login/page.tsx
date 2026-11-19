@@ -31,7 +31,7 @@ export default function LoginHubPage() {
   return (
     <div className="section !pt-10 max-w-2xl">
       <BrandLogo href="/" />
-      <p className="mt-6 text-xs uppercase tracking-[0.2em] text-lagoon">KokanProducts</p>
+      <p className="mt-6 text-xs uppercase tracking-[0.2em] text-lagoon">KonkanProducts</p>
       <h1 className="mt-2 font-display text-4xl text-ink">Choose your portal</h1>
       <p className="mt-2 text-ink/60">
         Customer, seller, and admin each have their own sign-in and registration.

@@ -164,7 +164,7 @@ async function ensureRoleAccounts() {
       await ensureUserFromEnv({
         emailEnv: "SEED_ADMIN_EMAIL",
         passwordEnv: "SEED_ADMIN_PASSWORD",
-        name: "Kokan Admin",
+        name: "Konkan Admin",
         phone: "9999900001",
         role: "admin",
       });
@@ -228,7 +228,7 @@ export async function syncSeedAccountPassword(
     await ensureUserFromEnv({
       emailEnv: "SEED_ADMIN_EMAIL",
       passwordEnv: "SEED_ADMIN_PASSWORD",
-      name: "Kokan Admin",
+      name: "Konkan Admin",
       phone: "9999900001",
       role: "admin",
     });

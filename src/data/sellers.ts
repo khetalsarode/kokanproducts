@@ -3,7 +3,7 @@ import type { Seller } from "@/types";
 export const sellers: Seller[] = [
   {
     id: "kp-internal",
-    name: "KokanProducts Kitchen",
+    name: "KonkanProducts Kitchen",
     location: "Ratnagiri, Maharashtra",
     rating: 4.8,
   },

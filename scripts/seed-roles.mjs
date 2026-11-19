@@ -113,7 +113,7 @@ try {
   if (adminEmail && adminPassword.length >= 8) {
     await ensureUser(db, {
       email: adminEmail,
-      name: "Kokan Admin",
+      name: "Konkan Admin",
       phone: "",
       role: "admin",
       password: adminPassword,

@@ -55,7 +55,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-foam/10 py-4 text-center text-xs text-foam/45">
-        © 2026 KokanProducts.com · Sample catalog demo
+        © 2026 KonkanProducts.com · Sample catalog demo
       </div>
     </footer>
   );
