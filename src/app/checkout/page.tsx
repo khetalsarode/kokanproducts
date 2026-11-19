@@ -12,6 +12,39 @@ import type { Address, Order } from "@/types";
 
 type CheckoutPay = "cod" | "online";
 
+declare global {
+  interface Window {
+    Cashfree?: (opts: { mode: "sandbox" | "production" }) => {
+      checkout: (opts: {
+        paymentSessionId: string;
+        redirectTarget?: "_self" | "_blank" | "_top" | "_modal";
+      }) => Promise<unknown>;
+    };
+  }
+}
+
+function loadCashfreeSdk(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.Cashfree) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-cashfree-sdk="1"]',
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Cashfree SDK failed")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+    script.async = true;
+    script.dataset.cashfreeSdk = "1";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Cashfree SDK failed to load"));
+    document.head.appendChild(script);
+  });
+}
+
 function CheckoutInner() {
   const router = useRouter();
   const search = useSearchParams();
@@ -23,6 +56,7 @@ function CheckoutInner() {
   const [couponCode, setCouponCode] = useState(couponFromUrl);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onlineReady, setOnlineReady] = useState(false);
   const [guestAddress, setGuestAddress] = useState({
     name: "",
     phone: "",
@@ -37,6 +71,21 @@ function CheckoutInner() {
       setAddressId(addresses.find((a) => a.isDefault)?.id ?? addresses[0].id);
     }
   }, [addresses, addressId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/checkout/payment-config", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d: { onlineEnabled?: boolean }) => {
+        if (!cancelled) setOnlineReady(Boolean(d.onlineEnabled));
+      })
+      .catch(() => {
+        if (!cancelled) setOnlineReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const discount = useMemo(() => {
     if (!couponCode) return 0;
@@ -67,6 +116,10 @@ function CheckoutInner() {
       setError("Sign in as a customer to place an order.");
       return;
     }
+    if (payment === "online" && !onlineReady) {
+      setError("Online payment is not connected yet. Please use Cash on Delivery.");
+      return;
+    }
     setSubmitting(true);
 
     let address: Address | undefined = addresses.find((a) => a.id === addressId);
@@ -93,23 +146,56 @@ function CheckoutInner() {
           address,
           paymentMethod: payment,
           couponCode: discount > 0 ? couponCode : undefined,
-          discount,
+          returnOrigin: window.location.origin,
         }),
       });
       const data = (await res.json()) as {
         error?: string;
         order?: Order;
-        payment?: { redirectUrl?: string };
+        payment?: {
+          redirectUrl?: string;
+          paymentSessionId?: string;
+          mode?: "sandbox" | "production";
+        };
       };
       if (!res.ok || !data.order) {
         setError(data.error || "Could not place order.");
         setSubmitting(false);
         return;
       }
-      if (data.payment?.redirectUrl) {
-        window.location.href = data.payment.redirectUrl;
-        return;
+
+      if (payment === "online") {
+        const sessionId = data.payment?.paymentSessionId;
+        if (!sessionId && data.payment?.redirectUrl) {
+          window.location.href = data.payment.redirectUrl;
+          return;
+        }
+        if (!sessionId) {
+          setError("Cashfree session was not created. Try COD or contact support.");
+          setSubmitting(false);
+          return;
+        }
+        try {
+          await loadCashfreeSdk();
+          if (!window.Cashfree) {
+            setError("Cashfree checkout failed to load.");
+            setSubmitting(false);
+            return;
+          }
+          const mode = data.payment?.mode === "production" ? "production" : "sandbox";
+          const cashfree = window.Cashfree({ mode });
+          await cashfree.checkout({
+            paymentSessionId: sessionId,
+            redirectTarget: "_self",
+          });
+          return;
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Could not open Cashfree checkout.");
+          setSubmitting(false);
+          return;
+        }
       }
+
       clearCart();
       setFlash(`Order ${data.order.id} placed`);
       router.push(`/orders/${data.order.id}?confirmed=1`);
@@ -123,7 +209,7 @@ function CheckoutInner() {
     <div className="section !pt-8">
       <h1 className="font-display text-4xl text-ink">Checkout</h1>
       <p className="mt-2 text-sm text-ink/55">
-        Place your order with Cash on Delivery now. Online payment (Cashfree) will plug in here later — no fake payment success.
+        Pay with Cash on Delivery, or complete online payment securely via Cashfree.
       </p>
       {(!customer || customer.role !== "customer") && (
         <p className="mt-4 rounded-sm border border-sea/15 bg-white/55 px-4 py-3 text-sm text-ink/70">
@@ -214,13 +300,18 @@ function CheckoutInner() {
               </button>
               <button
                 type="button"
-                onClick={() => setPayment("online")}
+                onClick={() => onlineReady && setPayment("online")}
+                disabled={!onlineReady}
                 className={`rounded-sm border p-4 text-left transition ${
                   payment === "online" ? "border-sea bg-white/80" : "border-sea/15 bg-white/40"
-                }`}
+                } ${!onlineReady ? "cursor-not-allowed opacity-60" : ""}`}
               >
                 <p className="font-medium text-ink">Online payment</p>
-                <p className="text-xs text-ink/50">Cashfree — coming soon (not active yet)</p>
+                <p className="text-xs text-ink/50">
+                  {onlineReady
+                    ? "UPI, cards & netbanking via Cashfree"
+                    : "Cashfree keys not connected yet"}
+                </p>
               </button>
             </div>
             {payment === "cod" && (
@@ -228,10 +319,15 @@ function CheckoutInner() {
                 Your order is saved as unpaid COD until delivery. Keep exact change ready.
               </p>
             )}
-            {payment === "online" && (
-              <p className="mt-4 rounded-sm border border-spice/30 bg-spice/5 px-3 py-2 text-sm text-ink/70">
-                Cashfree is not connected on this build. Choose Cash on Delivery to place an order now.
-                When CASHFREE_APP_ID and CASHFREE_SECRET_KEY are set, this option will redirect to Cashfree without faking success.
+            {payment === "online" && onlineReady && (
+              <p className="mt-4 text-sm text-ink/60">
+                You will be redirected to Cashfree to complete payment. Your order is confirmed only
+                after Cashfree reports success.
+              </p>
+            )}
+            {!onlineReady && (
+              <p className="mt-4 rounded-sm border border-sea/15 bg-white/40 px-3 py-2 text-sm text-ink/60">
+                Online payment activates once Cashfree app ID and secret are bound to this app.
               </p>
             )}
           </section>
@@ -282,7 +378,13 @@ function CheckoutInner() {
           </div>
           {error && <p className="mt-3 text-sm text-spice">{error}</p>}
           <button type="submit" className="btn-primary mt-6 w-full" disabled={submitting}>
-            {submitting ? "Placing…" : `Place order · ${formatINR(total)}`}
+            {submitting
+              ? payment === "online"
+                ? "Opening Cashfree…"
+                : "Placing…"
+              : payment === "online"
+                ? `Pay online · ${formatINR(total)}`
+                : `Place order · ${formatINR(total)}`}
           </button>
         </aside>
       </form>

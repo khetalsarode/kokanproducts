@@ -1,8 +1,9 @@
-import { cashfreeProvider } from "./cashfree";
+import { cashfreeProvider, cashfreeMode, fetchCashfreeOrderStatus } from "./cashfree";
 import { codProvider } from "./cod";
 import type { CreatePaymentInput, PaymentIntent, PayableMethod } from "./types";
 
 export type { PaymentIntent, PayableMethod, CreatePaymentInput };
+export { fetchCashfreeOrderStatus, cashfreeMode };
 
 export async function startPayment(
   method: PayableMethod,

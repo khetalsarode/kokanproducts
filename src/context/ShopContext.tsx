@@ -351,19 +351,13 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         estimatedDelivery: eta.toISOString(),
       };
 
+      // Local-only fallback; real checkout goes through /api/checkout/place-order.
       setOrders((prev) => [order, ...prev]);
       setCart([]);
       setFlash(`Order ${order.id} placed`);
-      if (customer) {
-        void fetch("/api/account/orders", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ order }),
-        });
-      }
       return order;
     },
-    [addresses, cart, cartSubtotal, customer],
+    [addresses, cart, cartSubtotal],
   );
 
   const getOrder = useCallback(
@@ -380,18 +374,10 @@ export function ShopProvider({ children }: { children: ReactNode }) {
           if (idx < 0 || idx >= STATUS_FLOW.length - 1) return o;
           return { ...o, status: STATUS_FLOW[idx + 1] };
         });
-        const updated = next.find((o) => o.id === id);
-        if (customer && updated) {
-          void fetch("/api/account/orders", {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ order: updated }),
-          });
-        }
         return next;
       });
     },
-    [customer],
+    [],
   );
 
   const saveAddress = useCallback(
