@@ -17,8 +17,8 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: {
-    default: "KokanProducts — Authentic Konkan Food",
-    template: "%s · KokanProducts",
+    default: "KonkanProducts — Authentic Konkan Food",
+    template: "%s · KonkanProducts",
   },
   description:
     "Authentic Konkan Food · Direct from Source · To Your Home. Specialty kokum, mango, cashews, coconut & more.",

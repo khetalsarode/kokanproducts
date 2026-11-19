@@ -1,4 +1,4 @@
-# KokanProducts.com — Customer MVP
+# KonkanProducts.com — Customer MVP
 
 Authentic Konkan specialty-food marketplace (customer shopping demo).
 
