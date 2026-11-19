@@ -33,6 +33,35 @@ function roleSeedFingerprint(): string {
   ].join("\0");
 }
 
+export function matchesSeedAdminCredentials(email: string, password: string): boolean {
+  const seedEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
+  const seedPassword = process.env.SEED_ADMIN_PASSWORD ?? "";
+  return (
+    seedEmail.length > 0 &&
+    seedPassword.length >= 8 &&
+    email.trim().toLowerCase() === seedEmail &&
+    password === seedPassword
+  );
+}
+
+export function matchesSeedSellerCredentials(email: string, password: string): boolean {
+  const seedEmail = process.env.SEED_SELLER_EMAIL?.trim().toLowerCase() ?? "";
+  const seedPassword = process.env.SEED_SELLER_PASSWORD ?? "";
+  return (
+    seedEmail.length > 0 &&
+    seedPassword.length >= 8 &&
+    email.trim().toLowerCase() === seedEmail &&
+    password === seedPassword
+  );
+}
+
+export function seedAdminConfigured(): boolean {
+  return Boolean(
+    process.env.SEED_ADMIN_EMAIL?.trim() &&
+      (process.env.SEED_ADMIN_PASSWORD?.length ?? 0) >= 8,
+  );
+}
+
 async function ensureUserFromEnv(input: {
   emailEnv: string;
   passwordEnv: string;
@@ -137,12 +166,12 @@ async function ensureCatalog() {
   catalogDone = true;
 }
 
-async function ensureRoleAccounts() {
+async function ensureRoleAccounts(force = false) {
   const fingerprint = roleSeedFingerprint();
-  if (fingerprint === lastRoleFingerprint) return;
+  if (!force && fingerprint === lastRoleFingerprint) return;
   if (roleSeedInFlight) {
     await roleSeedInFlight;
-    return;
+    if (!force) return;
   }
 
   roleSeedInFlight = (async () => {
@@ -179,6 +208,12 @@ async function ensureRoleAccounts() {
   })();
 
   await roleSeedInFlight;
+}
+
+/** Force recreate/update seeded role accounts from current SEED_* env. */
+export async function forceReseedRoleAccounts(): Promise<void> {
+  lastRoleFingerprint = "";
+  await ensureRoleAccounts(true);
 }
 
 /**

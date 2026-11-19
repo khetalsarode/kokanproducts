@@ -7,7 +7,12 @@ import {
 } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
 import { rateLimit } from "@/lib/rateLimit";
-import { ensureSeeded } from "@/lib/seed";
+import {
+  ensureSeeded,
+  forceReseedRoleAccounts,
+  matchesSeedAdminCredentials,
+  matchesSeedSellerCredentials,
+} from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +40,33 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await getUserByEmail(email);
-    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    // Always sync seeded admin/seller rows from env when that email is attempted,
+    // so Cursor SEED_* secrets create/update the account before password check.
+    const seedEmailAttempt =
+      matchesSeedAdminCredentials(email, password) ||
+      matchesSeedSellerCredentials(email, password) ||
+      email === (process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "") ||
+      email === (process.env.SEED_SELLER_EMAIL?.trim().toLowerCase() ?? "");
+
+    if (seedEmailAttempt) {
+      await forceReseedRoleAccounts();
+    }
+
+    let user = await getUserByEmail(email);
+    let passwordOk = user ? await verifyPassword(password, user.passwordHash) : false;
+
+    // Retry once if typed password matches SEED_* after sync.
+    if (
+      !passwordOk &&
+      (matchesSeedAdminCredentials(email, password) ||
+        matchesSeedSellerCredentials(email, password))
+    ) {
+      await forceReseedRoleAccounts();
+      user = await getUserByEmail(email);
+      passwordOk = user ? await verifyPassword(password, user.passwordHash) : false;
+    }
+
+    if (!user || !passwordOk) {
       return NextResponse.json(
         { error: "Invalid email or password." },
         { status: 401 },
