@@ -5,17 +5,25 @@ import { hashPassword } from "@/lib/password";
 
 let seeding: Promise<void> | null = null;
 
-async function ensureUser(input: {
-  email: string;
+async function ensureUserFromEnv(input: {
+  emailEnv: string;
+  passwordEnv: string;
   name: string;
   phone: string;
   role: UserRole;
-  password: string;
   shop?: { name: string; location: string; bio?: string };
 }) {
+  const email = process.env[input.emailEnv]?.trim().toLowerCase() ?? "";
+  const password = process.env[input.passwordEnv] ?? "";
+  if (!email || !password) return;
+  if (password.length < 8) {
+    console.error(`seed: ${input.passwordEnv} too short; skipped`);
+    return;
+  }
+
   const rows = await sql<{ id: string }>(
     `select id from customers where lower(email) = lower($1) limit 1`,
-    [input.email],
+    [email],
   );
   let id = rows[0]?.id;
   if (!id) {
@@ -23,14 +31,7 @@ async function ensureUser(input: {
     await sql(
       `insert into customers (id, email, password_hash, name, phone, role, status)
        values ($1,$2,$3,$4,$5,$6,'active')`,
-      [
-        id,
-        input.email.toLowerCase(),
-        await hashPassword(input.password),
-        input.name,
-        input.phone,
-        input.role,
-      ],
+      [id, email, await hashPassword(password), input.name, input.phone, input.role],
     );
   } else {
     await sql(`update customers set role = $1 where id = $2`, [input.role, id]);
@@ -90,23 +91,23 @@ async function ensureCatalog() {
 
 async function runSeed() {
   try {
-    await ensureUser({
-      email: "admin@kokanproducts.com",
+    // Role accounts only when the platform/operator supplies secrets — never hardcoded.
+    await ensureUserFromEnv({
+      emailEnv: "SEED_ADMIN_EMAIL",
+      passwordEnv: "SEED_ADMIN_PASSWORD",
       name: "Kokan Admin",
-      phone: "9999990001",
+      phone: "",
       role: "admin",
-      password: "Admin@Kokan1",
     });
-    await ensureUser({
-      email: "seller@kokanproducts.com",
-      name: "Devgad Orchards",
-      phone: "9999990002",
+    await ensureUserFromEnv({
+      emailEnv: "SEED_SELLER_EMAIL",
+      passwordEnv: "SEED_SELLER_PASSWORD",
+      name: "Seeded Seller",
+      phone: "",
       role: "seller",
-      password: "Seller@Kokan1",
       shop: {
-        name: "Devgad Orchards",
-        location: "Devgad, Maharashtra",
-        bio: "Hapus & coastal pantry",
+        name: process.env.SEED_SELLER_SHOP?.trim() || "Konkan Seller",
+        location: process.env.SEED_SELLER_LOCATION?.trim() || "Konkan",
       },
     });
     await ensureCatalog();
@@ -115,7 +116,7 @@ async function runSeed() {
   }
 }
 
-/** Idempotent demo seed — admin, seller, catalog rows. */
+/** Idempotent catalog seed; optional admin/seller only via SEED_* env vars. */
 export function ensureSeeded(): Promise<void> {
   seeding ??= runSeed().finally(() => {
     /* keep resolved promise cached */

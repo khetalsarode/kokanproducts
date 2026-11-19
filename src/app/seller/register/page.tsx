@@ -56,7 +56,7 @@ export default function SellerRegisterPage() {
       <p className="mt-6 text-xs uppercase tracking-[0.2em] text-lagoon">Sell on KokanProducts</p>
       <h1 className="mt-2 font-display text-4xl text-ink">Seller registration</h1>
       <p className="mt-2 text-ink/60">
-        Create a seller account to list Konkan products, manage stock, and fulfil your orders.
+        Create a seller account to list Konkan products. An admin must approve your shop before you can manage the catalogue or orders.
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 grid gap-3">

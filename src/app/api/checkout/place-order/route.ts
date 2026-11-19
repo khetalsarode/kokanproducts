@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getRequestUser, newId } from "@/lib/auth";
-import { getCatalogProduct } from "@/lib/catalog";
+import { applyCoupon } from "@/data/coupons";
 import { sql } from "@/lib/db";
 import { isOnlinePaymentConfigured, startPayment } from "@/lib/payments";
+import { rateLimit } from "@/lib/rateLimit";
 import { ensureSeeded } from "@/lib/seed";
-import type { Address, Order, OrderLine, PaymentMethod } from "@/types";
+import type { Address, Fulfillment, Order, OrderLine, PaymentMethod } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -17,14 +18,39 @@ function makeTrackingId(): string {
   return `DTDC${Math.floor(100000000 + Math.random() * 900000000)}`;
 }
 
+type StockRow = {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  fulfillment: string;
+  seller_user_id: string | null;
+  active: boolean;
+};
+
 export async function POST(request: Request) {
   try {
     await ensureSeeded();
     const user = await getRequestUser();
+    if (!user || user.role !== "customer") {
+      return NextResponse.json(
+        { error: "Sign in as a customer to place an order." },
+        { status: 401 },
+      );
+    }
+
+    const limited = rateLimit(`checkout:${user.id}`, 8, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: `Too many checkout attempts. Try again in ${limited.retryAfterSec}s.` },
+        { status: 429 },
+      );
+    }
+
     const body = (await request.json()) as {
       items?: { productId: string; qty: number }[];
       address?: Address;
-      paymentMethod?: PaymentMethod | "online";
+      paymentMethod?: PaymentMethod | "online" | "cod";
       couponCode?: string;
       discount?: number;
     };
@@ -33,11 +59,19 @@ export async function POST(request: Request) {
     if (itemsIn.length === 0) {
       return NextResponse.json({ error: "Cart is empty." }, { status: 400 });
     }
+    if (itemsIn.length > 50) {
+      return NextResponse.json({ error: "Too many line items." }, { status: 400 });
+    }
     if (!body.address?.name || !body.address.line1 || !body.address.city || !body.address.pincode) {
       return NextResponse.json({ error: "Delivery address is incomplete." }, { status: 400 });
     }
 
-    const method = body.paymentMethod === "cod" ? "cod" : body.paymentMethod === "online" ? "online" : body.paymentMethod;
+    const method =
+      body.paymentMethod === "cod"
+        ? "cod"
+        : body.paymentMethod === "online"
+          ? "online"
+          : body.paymentMethod;
     if (method !== "cod" && method !== "online") {
       return NextResponse.json(
         { error: "Choose Cash on Delivery or Online payment." },
@@ -56,27 +90,59 @@ export async function POST(request: Request) {
 
     const lines: OrderLine[] = [];
     let subtotal = 0;
+
     for (const item of itemsIn) {
-      const qty = Math.max(1, Math.floor(Number(item.qty) || 0));
-      const product = await getCatalogProduct(item.productId);
-      if (!product || product.stock < qty) {
+      const qty = Math.max(1, Math.min(99, Math.floor(Number(item.qty) || 0)));
+      if (!item.productId || qty < 1) {
+        return NextResponse.json({ error: "Invalid cart item." }, { status: 400 });
+      }
+
+      // Atomic stock reservation — fails if another order took the units.
+      const updated = await sql<StockRow>(
+        `update catalog_products
+         set stock = stock - $1, updated_at = now()
+         where id = $2 and active = true and stock >= $1
+         returning id, name, price, stock, fulfillment, seller_user_id, active`,
+        [qty, item.productId],
+      );
+      const product = updated[0];
+      if (!product) {
         return NextResponse.json(
-          { error: `Insufficient stock for ${product?.name || item.productId}.` },
+          { error: `Insufficient stock for ${item.productId}.` },
           { status: 400 },
         );
       }
+
       lines.push({
         productId: product.id,
         name: product.name,
         qty,
-        price: product.price,
-        fulfillment: product.fulfillment,
-        sellerName: product.sellerId,
+        price: Number(product.price),
+        fulfillment: (product.fulfillment as Fulfillment) || "internal",
+        sellerName: product.seller_user_id || "kp-internal",
       });
-      subtotal += product.price * qty;
+      subtotal += Number(product.price) * qty;
     }
 
-    const discount = Math.max(0, Math.min(subtotal, Math.floor(Number(body.discount) || 0)));
+    // Ignore client-supplied discount; recompute from coupon code only.
+    let discount = 0;
+    let couponCode: string | undefined;
+    if (body.couponCode?.trim()) {
+      const result = applyCoupon(body.couponCode, subtotal);
+      if (!result.ok) {
+        // Roll back reserved stock
+        for (const line of lines) {
+          await sql(
+            `update catalog_products set stock = stock + $1, updated_at = now() where id = $2`,
+            [line.qty, line.productId],
+          );
+        }
+        return NextResponse.json({ error: result.message }, { status: 400 });
+      }
+      discount = result.discount;
+      couponCode = result.coupon.code;
+    }
+
     const deliveryFee = subtotal - discount >= 999 ? 0 : 49;
     const total = Math.max(0, subtotal - discount + deliveryFee);
     const orderId = makeOrderId();
@@ -88,18 +154,21 @@ export async function POST(request: Request) {
       orderId,
       amountPaise: total * 100,
       customer: {
-        id: user?.id,
+        id: user.id,
         name: body.address.name,
-        email: user?.email,
+        email: user.email,
         phone: body.address.phone,
       },
       method: method === "cod" ? "cod" : "online",
     });
 
-    if (method === "online" && payment.status !== "awaiting_gateway") {
-      // No fake paid status without gateway
-    }
     if (method === "online" && !payment.redirectUrl) {
+      for (const line of lines) {
+        await sql(
+          `update catalog_products set stock = stock + $1, updated_at = now() where id = $2`,
+          [line.qty, line.productId],
+        );
+      }
       return NextResponse.json(
         {
           error:
@@ -122,7 +191,7 @@ export async function POST(request: Request) {
       )`,
       [
         orderId,
-        user?.id ?? null,
+        user.id,
         method === "cod" ? "cod" : "online",
         paymentStatus,
         payment.provider,
@@ -130,21 +199,13 @@ export async function POST(request: Request) {
         discount,
         deliveryFee,
         total,
-        body.couponCode || null,
+        couponCode || null,
         trackingId,
         eta.toISOString(),
         JSON.stringify(address),
         JSON.stringify(lines),
       ],
     );
-
-    for (const line of lines) {
-      await sql(
-        `update catalog_products set stock = greatest(0, stock - $1), updated_at = now()
-         where id = $2`,
-        [line.qty, line.productId],
-      );
-    }
 
     const order: Order = {
       id: orderId,
@@ -157,21 +218,19 @@ export async function POST(request: Request) {
       discount,
       deliveryFee,
       total,
-      couponCode: body.couponCode,
+      couponCode,
       trackingId,
       courier: "Delhivery",
       estimatedDelivery: eta.toISOString(),
     };
 
-    if (user) {
-      await sql(
-        `insert into customer_orders (id, customer_id, payload)
-         values ($1, $2, $3::jsonb)
-         on conflict (id) do update set payload = excluded.payload
-         where customer_orders.customer_id = $2`,
-        [orderId, user.id, JSON.stringify(order)],
-      );
-    }
+    await sql(
+      `insert into customer_orders (id, customer_id, payload)
+       values ($1, $2, $3::jsonb)
+       on conflict (id) do update set payload = excluded.payload
+       where customer_orders.customer_id = $2`,
+      [orderId, user.id, JSON.stringify(order)],
+    );
 
     return NextResponse.json(
       {

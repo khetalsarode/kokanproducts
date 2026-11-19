@@ -63,6 +63,10 @@ function CheckoutInner() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!customer || customer.role !== "customer") {
+      setError("Sign in as a customer to place an order.");
+      return;
+    }
     setSubmitting(true);
 
     let address: Address | undefined = addresses.find((a) => a.id === addressId);
@@ -77,7 +81,7 @@ function CheckoutInner() {
         label: "Delivery",
         ...guestAddress,
       };
-      if (customer) saveAddress(address);
+      saveAddress(address);
     }
 
     try {
@@ -121,13 +125,17 @@ function CheckoutInner() {
       <p className="mt-2 text-sm text-ink/55">
         Place your order with Cash on Delivery now. Online payment (Cashfree) will plug in here later — no fake payment success.
       </p>
-      {!customer && (
+      {(!customer || customer.role !== "customer") && (
         <p className="mt-4 rounded-sm border border-sea/15 bg-white/55 px-4 py-3 text-sm text-ink/70">
-          Guest checkout works.{" "}
+          Please{" "}
           <Link href="/login?next=/checkout" className="font-medium text-sea hover:underline">
-            Sign in
+            sign in
           </Link>{" "}
-          to save this order to your account history.
+          or{" "}
+          <Link href="/register" className="font-medium text-sea hover:underline">
+            create a customer account
+          </Link>{" "}
+          to place an order (required to protect stock).
         </p>
       )}
 

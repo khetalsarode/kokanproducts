@@ -1,8 +1,12 @@
 /**
- * Seeds demo admin + seller and imports static catalog into catalog_products.
- * Safe to re-run: uses ON CONFLICT / existence checks.
+ * Optional role seed for production/staging when SEED_* env vars are set.
+ * Never embeds passwords. Skips entirely when vars are absent.
+ *
+ * SEED_ADMIN_EMAIL + SEED_ADMIN_PASSWORD
+ * SEED_SELLER_EMAIL + SEED_SELLER_PASSWORD (optional)
+ * SEED_SELLER_SHOP / SEED_SELLER_LOCATION (optional)
  */
-import { createHash, randomBytes, scrypt } from "node:crypto";
+import { randomBytes, scrypt } from "node:crypto";
 import { promisify } from "node:util";
 import { readdir, readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
@@ -54,10 +58,7 @@ async function ensureUser(db, { email, name, phone, role, password, shop }) {
     [email],
   );
   if (existing[0]) {
-    await db.sql(`update customers set role = $1 where id = $2`, [
-      role,
-      existing[0].id,
-    ]);
+    await db.sql(`update customers set role = $1 where id = $2`, [role, existing[0].id]);
     if (shop) {
       await db.sql(
         `insert into seller_profiles (user_id, shop_name, location, bio, approved)
@@ -69,96 +70,62 @@ async function ensureUser(db, { email, name, phone, role, password, shop }) {
     return existing[0].id;
   }
   const id = newId();
-  const passwordHash = await hashPassword(password);
   await db.sql(
     `insert into customers (id, email, password_hash, name, phone, role, status)
      values ($1,$2,$3,$4,$5,$6,'active')`,
-    [id, email, passwordHash, name, phone, role],
+    [id, email, await hashPassword(password), name, phone, role],
   );
   if (shop) {
     await db.sql(
       `insert into seller_profiles (user_id, shop_name, location, bio, approved)
-       values ($1,$2,$3,$4,$5)`,
-      [id, shop.name, shop.location, shop.bio || "", true],
+       values ($1,$2,$3,$4,true)`,
+      [id, shop.name, shop.location, shop.bio || ""],
     );
   }
   return id;
 }
 
-async function seedCatalog(db) {
-  const { products } = await import("../src/data/products.ts").catch(() => ({
-    products: null,
-  }));
-  if (!products) {
-    // Fallback: dynamic import via tsx not available — parse lightly skipped
-    console.log("seed: skip catalog import (run via app seed API)");
-    return;
-  }
-  for (const p of products) {
-    await db.sql(
-      `insert into catalog_products (
-        id, slug, name, short_name, category, description, price, mrp, unit, weight,
-        stock, fulfillment, rating, review_count, tags, accent, image_url, image_url_2, fssai, active
-      ) values (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,true
-      )
-      on conflict (id) do update set
-        name = excluded.name,
-        price = excluded.price,
-        mrp = excluded.mrp,
-        stock = excluded.stock,
-        image_url = excluded.image_url,
-        image_url_2 = excluded.image_url_2,
-        updated_at = now()`,
-      [
-        p.id,
-        p.slug,
-        p.name,
-        p.shortName,
-        p.category,
-        p.description,
-        p.price,
-        p.mrp,
-        p.unit,
-        p.weight,
-        p.stock,
-        p.fulfillment,
-        p.rating,
-        p.reviewCount,
-        p.tags.join(","),
-        p.accent,
-        p.images[0] || "",
-        p.images[1] || "",
-        p.fssai,
-      ],
-    );
-  }
-  console.log(`seed: catalog ${products.length} products`);
+const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
+const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "";
+const sellerEmail = process.env.SEED_SELLER_EMAIL?.trim().toLowerCase() ?? "";
+const sellerPassword = process.env.SEED_SELLER_PASSWORD ?? "";
+
+if (!adminEmail && !sellerEmail) {
+  console.log("seed-roles: skipped (set SEED_ADMIN_EMAIL/PASSWORD or SEED_SELLER_* to provision)");
+  process.exit(0);
 }
 
 const db = await getDb();
 try {
-  await ensureUser(db, {
-    email: "admin@kokanproducts.com",
-    name: "Kokan Admin",
-    phone: "9999990001",
-    role: "admin",
-    password: "Admin@Kokan1",
-  });
-  await ensureUser(db, {
-    email: "seller@kokanproducts.com",
-    name: "Devgad Orchards",
-    phone: "9999990002",
-    role: "seller",
-    password: "Seller@Kokan1",
-    shop: {
-      name: "Devgad Orchards",
-      location: "Devgad, Maharashtra",
-      bio: "Hapus & coastal pantry",
-    },
-  });
-  console.log("seed: admin + seller ready");
-  // Catalog seed via dedicated API on first admin visit when ts import fails here
+  if (adminEmail && adminPassword.length >= 8) {
+    await ensureUser(db, {
+      email: adminEmail,
+      name: "Kokan Admin",
+      phone: "",
+      role: "admin",
+      password: adminPassword,
+    });
+    console.log("seed-roles: admin provisioned from env");
+  } else if (adminEmail || adminPassword) {
+    console.log("seed-roles: admin skipped (need both email and password ≥8 chars)");
+  }
+
+  if (sellerEmail && sellerPassword.length >= 8) {
+    await ensureUser(db, {
+      email: sellerEmail,
+      name: "Seeded Seller",
+      phone: "",
+      role: "seller",
+      password: sellerPassword,
+      shop: {
+        name: process.env.SEED_SELLER_SHOP?.trim() || "Konkan Seller",
+        location: process.env.SEED_SELLER_LOCATION?.trim() || "Konkan",
+      },
+    });
+    console.log("seed-roles: seller provisioned from env");
+  } else if (sellerEmail || sellerPassword) {
+    console.log("seed-roles: seller skipped (need both email and password ≥8 chars)");
+  }
 } finally {
   await db.end();
 }

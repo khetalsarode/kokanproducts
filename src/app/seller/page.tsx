@@ -115,6 +115,11 @@ export default function SellerPage() {
           <p className="mt-2 text-ink/60">
             {customer.shopName || customer.name} — manage your products, stock, and order statuses.
           </p>
+          {customer.shopApproved === false && (
+            <p className="mt-3 rounded-sm border border-spice/25 bg-spice/5 px-3 py-2 text-sm text-ink/70">
+              Your seller account is pending admin approval. You can sign in, but catalogue and order tools stay locked until approved.
+            </p>
+          )}
         </div>
         <button type="button" className="btn-outline" onClick={() => void logout()}>
           Sign out

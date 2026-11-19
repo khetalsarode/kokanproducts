@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     if (wantSeller) {
       await sql(
         `insert into seller_profiles (user_id, shop_name, location, bio, approved)
-         values ($1, $2, $3, $4, true)`,
+         values ($1, $2, $3, $4, false)`,
         [
           id,
           (body.shopName ?? "").trim(),
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
           status: "active",
           createdAt: new Date().toISOString(),
           shopName: wantSeller ? (body.shopName ?? "").trim() : undefined,
-          shopApproved: wantSeller ? true : undefined,
+          shopApproved: wantSeller ? false : undefined,
         },
       },
       { headers: { "cache-control": "private, no-store" } },

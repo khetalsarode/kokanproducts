@@ -219,7 +219,27 @@ export default function AdminPage() {
                 {u.email}
                 {u.shopName ? ` · ${u.shopName}` : ""}
               </p>
-              <p className="text-xs text-ink/40">status: {u.status}</p>
+              <p className="text-xs text-ink/40">
+                status: {u.status}
+                {u.role === "seller"
+                  ? ` · shop ${u.shopApproved ? "approved" : "pending approval"}`
+                  : ""}
+              </p>
+              {u.role === "seller" && !u.shopApproved && (
+                <button
+                  type="button"
+                  className="mt-2 text-sm font-medium text-sea hover:underline"
+                  onClick={() =>
+                    void fetch("/api/admin/users", {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ id: u.id, approved: true }),
+                    }).then(load)
+                  }
+                >
+                  Approve seller
+                </button>
+              )}
             </li>
           ))}
         </ul>
