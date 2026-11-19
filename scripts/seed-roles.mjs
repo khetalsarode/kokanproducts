@@ -53,12 +53,20 @@ function newId() {
 }
 
 async function ensureUser(db, { email, name, phone, role, password, shop }) {
+  const passwordHash = await hashPassword(password);
   const existing = await db.sql(
     `select id from customers where lower(email) = lower($1) limit 1`,
     [email],
   );
   if (existing[0]) {
-    await db.sql(`update customers set role = $1 where id = $2`, [role, existing[0].id]);
+    // Always overwrite password when promoting a seed role — never keep a
+    // self-registered password for admin/seller emails.
+    await db.sql(
+      `update customers
+       set role = $1, password_hash = $2, name = $3, status = 'active'
+       where id = $4`,
+      [role, passwordHash, name, existing[0].id],
+    );
     if (shop) {
       await db.sql(
         `insert into seller_profiles (user_id, shop_name, location, bio, approved)
@@ -73,7 +81,7 @@ async function ensureUser(db, { email, name, phone, role, password, shop }) {
   await db.sql(
     `insert into customers (id, email, password_hash, name, phone, role, status)
      values ($1,$2,$3,$4,$5,$6,'active')`,
-    [id, email, await hashPassword(password), name, phone, role],
+    [id, email, passwordHash, name, phone, role],
   );
   if (shop) {
     await db.sql(

@@ -9,7 +9,7 @@ import {
 import { sql } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { rateLimit } from "@/lib/rateLimit";
-import { ensureSeeded } from "@/lib/seed";
+import { ensureSeeded, reservedSeedEmails } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +50,12 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Password must be at least 8 characters." },
         { status: 400 },
+      );
+    }
+    if (reservedSeedEmails().has(email)) {
+      return NextResponse.json(
+        { error: "This email is reserved. Choose another address." },
+        { status: 403 },
       );
     }
     if (wantSeller && !(body.shopName ?? "").trim()) {

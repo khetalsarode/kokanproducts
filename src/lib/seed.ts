@@ -5,6 +5,18 @@ import { hashPassword } from "@/lib/password";
 
 let seeding: Promise<void> | null = null;
 
+/** Emails reserved for SEED_* provisioning — registration must not claim them. */
+export function reservedSeedEmails(): Set<string> {
+  const emails = [
+    process.env.SEED_ADMIN_EMAIL,
+    process.env.SEED_SELLER_EMAIL,
+    process.env.SEED_CUSTOMER_EMAIL,
+  ]
+    .map((v) => v?.trim().toLowerCase() ?? "")
+    .filter(Boolean);
+  return new Set(emails);
+}
+
 async function ensureUserFromEnv(input: {
   emailEnv: string;
   passwordEnv: string;
@@ -21,21 +33,36 @@ async function ensureUserFromEnv(input: {
     return;
   }
 
-  const rows = await sql<{ id: string }>(
-    `select id from customers where lower(email) = lower($1) limit 1`,
+  const passwordHash = await hashPassword(password);
+  const rows = await sql<{ id: string; role: string }>(
+    `select id, role from customers where lower(email) = lower($1) limit 1`,
     [email],
   );
   let id = rows[0]?.id;
+
   if (!id) {
     id = newId();
     await sql(
       `insert into customers (id, email, password_hash, name, phone, role, status)
        values ($1,$2,$3,$4,$5,$6,'active')`,
-      [id, email, await hashPassword(password), input.name, input.phone, input.role],
+      [id, email, passwordHash, input.name, input.phone, input.role],
     );
   } else {
-    await sql(`update customers set role = $1 where id = $2`, [input.role, id]);
+    // Always overwrite password_hash when promoting — never leave a
+    // self-registered password in place for a seeded privileged role.
+    await sql(
+      `update customers
+       set role = $1,
+           password_hash = $2,
+           name = $3,
+           phone = coalesce(nullif($4, ''), phone),
+           status = 'active',
+           updated_at = now()
+       where id = $5`,
+      [input.role, passwordHash, input.name, input.phone, id],
+    );
   }
+
   if (input.shop) {
     await sql(
       `insert into seller_profiles (user_id, shop_name, location, bio, approved)
@@ -110,13 +137,20 @@ async function runSeed() {
         location: process.env.SEED_SELLER_LOCATION?.trim() || "Konkan",
       },
     });
+    await ensureUserFromEnv({
+      emailEnv: "SEED_CUSTOMER_EMAIL",
+      passwordEnv: "SEED_CUSTOMER_PASSWORD",
+      name: "Demo Customer",
+      phone: "",
+      role: "customer",
+    });
     await ensureCatalog();
   } catch (error) {
     console.error("seed failed", error instanceof Error ? error.message : "unknown");
   }
 }
 
-/** Idempotent catalog seed; optional admin/seller only via SEED_* env vars. */
+/** Idempotent catalog seed; optional role accounts only via SEED_* env vars. */
 export function ensureSeeded(): Promise<void> {
   seeding ??= runSeed().finally(() => {
     /* keep resolved promise cached */
