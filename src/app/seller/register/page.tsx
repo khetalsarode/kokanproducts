@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BrandLogo } from "@/components/BrandLogo";
+import { RoleAuthShell } from "@/components/RoleAuthShell";
 import { useAuth } from "@/context/AuthContext";
 
 export default function SellerRegisterPage() {
@@ -21,9 +20,11 @@ export default function SellerRegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (ready && customer) {
-    router.replace(customer.role === "seller" ? "/seller" : "/account");
-  }
+  useEffect(() => {
+    if (ready && customer?.role === "seller") {
+      router.replace("/seller");
+    }
+  }, [ready, customer, router]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -51,15 +52,11 @@ export default function SellerRegisterPage() {
   }
 
   return (
-    <div className="section !pt-10 max-w-lg">
-      <BrandLogo href="/" />
-      <p className="mt-6 text-xs uppercase tracking-[0.2em] text-lagoon">Sell on KokanProducts</p>
-      <h1 className="mt-2 font-display text-4xl text-ink">Seller registration</h1>
-      <p className="mt-2 text-ink/60">
-        Create a seller account to list Konkan products. An admin must approve your shop before you can manage the catalogue or orders.
+    <RoleAuthShell role="seller" mode="register">
+      <p className="mb-4 text-sm text-ink/55">
+        New seller shops stay pending until an admin approves them under Admin → Users.
       </p>
-
-      <form onSubmit={onSubmit} className="mt-8 grid gap-3">
+      <form onSubmit={onSubmit} className="grid gap-3">
         {(
           [
             ["name", "Your full name"],
@@ -75,7 +72,13 @@ export default function SellerRegisterPage() {
             <span className="text-ink/70">{label}</span>
             <input
               className="field"
-              type={key.includes("password") || key === "confirm" ? "password" : key === "email" ? "email" : "text"}
+              type={
+                key.includes("password") || key === "confirm"
+                  ? "password"
+                  : key === "email"
+                    ? "email"
+                    : "text"
+              }
               value={form[key]}
               onChange={(e) => setForm({ ...form, [key]: e.target.value })}
               required={key !== "phone"}
@@ -88,13 +91,6 @@ export default function SellerRegisterPage() {
           {busy ? "Creating…" : "Create seller account"}
         </button>
       </form>
-
-      <p className="mt-6 text-sm text-ink/60">
-        Already registered?{" "}
-        <Link href="/login?next=/seller" className="font-medium text-sea hover:underline">
-          Sign in
-        </Link>
-      </p>
-    </div>
+    </RoleAuthShell>
   );
 }

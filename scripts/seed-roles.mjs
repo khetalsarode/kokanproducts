@@ -4,6 +4,7 @@
  *
  * SEED_ADMIN_EMAIL + SEED_ADMIN_PASSWORD
  * SEED_SELLER_EMAIL + SEED_SELLER_PASSWORD (optional)
+ * SEED_CUSTOMER_EMAIL + SEED_CUSTOMER_PASSWORD (optional)
  * SEED_SELLER_SHOP / SEED_SELLER_LOCATION (optional)
  */
 import { randomBytes, scrypt } from "node:crypto";
@@ -97,9 +98,13 @@ const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "";
 const sellerEmail = process.env.SEED_SELLER_EMAIL?.trim().toLowerCase() ?? "";
 const sellerPassword = process.env.SEED_SELLER_PASSWORD ?? "";
+const customerEmail = process.env.SEED_CUSTOMER_EMAIL?.trim().toLowerCase() ?? "";
+const customerPassword = process.env.SEED_CUSTOMER_PASSWORD ?? "";
 
-if (!adminEmail && !sellerEmail) {
-  console.log("seed-roles: skipped (set SEED_ADMIN_EMAIL/PASSWORD or SEED_SELLER_* to provision)");
+if (!adminEmail && !sellerEmail && !customerEmail) {
+  console.log(
+    "seed-roles: skipped (set SEED_ADMIN_*, SEED_SELLER_*, and/or SEED_CUSTOMER_* to provision)",
+  );
   process.exit(0);
 }
 
@@ -133,6 +138,19 @@ try {
     console.log("seed-roles: seller provisioned from env");
   } else if (sellerEmail || sellerPassword) {
     console.log("seed-roles: seller skipped (need both email and password ≥8 chars)");
+  }
+
+  if (customerEmail && customerPassword.length >= 8) {
+    await ensureUser(db, {
+      email: customerEmail,
+      name: "Demo Customer",
+      phone: "9999900003",
+      role: "customer",
+      password: customerPassword,
+    });
+    console.log("seed-roles: customer provisioned from env");
+  } else if (customerEmail || customerPassword) {
+    console.log("seed-roles: customer skipped (need both email and password ≥8 chars)");
   }
 } finally {
   await db.end();

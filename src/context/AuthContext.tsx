@@ -28,13 +28,17 @@ type AuthContextValue = {
   ready: boolean;
   customer: AuthCustomer | null;
   refresh: () => Promise<void>;
-  login: (email: string, password: string) => Promise<string | null>;
+  login: (
+    email: string,
+    password: string,
+    expectedRole?: AuthRole,
+  ) => Promise<string | null>;
   register: (input: {
     name: string;
     email: string;
     phone: string;
     password: string;
-    role?: "customer" | "seller";
+    role?: AuthRole;
     shopName?: string;
     location?: string;
   }) => Promise<string | null>;
@@ -85,17 +89,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    if (!res.ok) return readError(res);
-    const data = (await res.json()) as { customer: AuthCustomer };
-    setCustomer({ ...data.customer, role: data.customer.role || "customer" });
-    return null;
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string, expectedRole?: AuthRole) => {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password, expectedRole }),
+      });
+      if (!res.ok) return readError(res);
+      const data = (await res.json()) as { customer: AuthCustomer };
+      setCustomer({ ...data.customer, role: data.customer.role || "customer" });
+      return null;
+    },
+    [],
+  );
 
   const register = useCallback(
     async (input: {
@@ -103,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       phone: string;
       password: string;
-      role?: "customer" | "seller";
+      role?: AuthRole;
       shopName?: string;
       location?: string;
     }) => {

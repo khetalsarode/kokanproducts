@@ -43,10 +43,10 @@ export default function AccountPage() {
           across devices — just like a full e-commerce store.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/register" className="btn-primary">
+          <Link href="/customer/register" className="btn-primary">
             Create account
           </Link>
-          <Link href="/login" className="btn-outline">
+          <Link href="/customer/login" className="btn-outline">
             Sign in
           </Link>
         </div>

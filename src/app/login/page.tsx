@@ -1,96 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
-import { dashboardPathForRole, useAuth } from "@/context/AuthContext";
 
-function LoginForm() {
-  const { login, customer, ready } = useAuth();
-  const router = useRouter();
-  const params = useSearchParams();
-  const next = params.get("next");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+const portals = [
+  {
+    role: "Customer",
+    href: "/customer/login",
+    register: "/customer/register",
+    dash: "/account",
+    text: "Shop, checkout, and track orders.",
+  },
+  {
+    role: "Seller",
+    href: "/seller/login",
+    register: "/seller/register",
+    dash: "/seller",
+    text: "List products and fulfill your lines.",
+  },
+  {
+    role: "Admin",
+    href: "/admin/login",
+    register: "/admin/register",
+    dash: "/admin",
+    text: "Catalogue, users, and all orders.",
+  },
+] as const;
 
-  if (ready && customer) {
-    router.replace(next || dashboardPathForRole(customer.role));
-  }
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    const err = await login(email, password);
-    setBusy(false);
-    if (err) {
-      setError(err);
-      return;
-    }
-  }
-
+export default function LoginHubPage() {
   return (
-    <div className="section !pt-10 max-w-lg">
+    <div className="section !pt-10 max-w-2xl">
       <BrandLogo href="/" />
-      <p className="mt-6 text-xs uppercase tracking-[0.2em] text-lagoon">Welcome back</p>
-      <h1 className="mt-2 font-display text-4xl text-ink">Sign in</h1>
+      <p className="mt-6 text-xs uppercase tracking-[0.2em] text-lagoon">KokanProducts</p>
+      <h1 className="mt-2 font-display text-4xl text-ink">Choose your portal</h1>
       <p className="mt-2 text-ink/60">
-        Customers, sellers, and admins use the same sign-in — you’ll land on the right dashboard.
+        Customer, seller, and admin each have their own sign-in and registration.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-8 grid gap-3">
-        <label className="grid gap-1 text-sm">
-          <span className="text-ink/70">Email</span>
-          <input
-            className="field"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-ink/70">Password</span>
-          <input
-            className="field"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-          />
-        </label>
-        {error && <p className="text-sm text-spice">{error}</p>}
-        <button type="submit" className="btn-primary w-fit" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
-
-      <p className="mt-6 text-sm text-ink/60">
-        New customer?{" "}
-        <Link href="/register" className="font-medium text-sea hover:underline">
-          Create an account
-        </Link>
-      </p>
-      <p className="mt-2 text-sm text-ink/60">
-        Want to sell?{" "}
-        <Link href="/seller/register" className="font-medium text-sea hover:underline">
-          Seller registration
-        </Link>
-      </p>
+      <div className="mt-8 grid gap-4">
+        {portals.map((p) => (
+          <div
+            key={p.role}
+            className="rounded-sm border border-sea/15 bg-white/55 px-5 py-4"
+          >
+            <h2 className="font-display text-2xl text-ink">{p.role}</h2>
+            <p className="mt-1 text-sm text-ink/60">{p.text}</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href={p.href} className="btn-primary">
+                Sign in
+              </Link>
+              <Link href={p.register} className="btn-outline">
+                Register
+              </Link>
+              <Link
+                href={p.dash}
+                className="self-center text-sm text-sea hover:underline"
+              >
+                {p.role} home →
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="section text-ink/50">Loading…</div>}>
-      <LoginForm />
-    </Suspense>
   );
 }

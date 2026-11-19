@@ -123,25 +123,25 @@ async function runSeed() {
       emailEnv: "SEED_ADMIN_EMAIL",
       passwordEnv: "SEED_ADMIN_PASSWORD",
       name: "Kokan Admin",
-      phone: "",
+      phone: "9999900001",
       role: "admin",
     });
     await ensureUserFromEnv({
       emailEnv: "SEED_SELLER_EMAIL",
       passwordEnv: "SEED_SELLER_PASSWORD",
-      name: "Seeded Seller",
-      phone: "",
+      name: "Konkan Seller",
+      phone: "9999900002",
       role: "seller",
       shop: {
-        name: process.env.SEED_SELLER_SHOP?.trim() || "Konkan Seller",
-        location: process.env.SEED_SELLER_LOCATION?.trim() || "Konkan",
+        name: process.env.SEED_SELLER_SHOP?.trim() || "Konkan Seller Shop",
+        location: process.env.SEED_SELLER_LOCATION?.trim() || "Konkan, Maharashtra",
       },
     });
     await ensureUserFromEnv({
       emailEnv: "SEED_CUSTOMER_EMAIL",
       passwordEnv: "SEED_CUSTOMER_PASSWORD",
       name: "Demo Customer",
-      phone: "",
+      phone: "9999900003",
       role: "customer",
     });
     await ensureCatalog();

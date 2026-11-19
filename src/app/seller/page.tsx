@@ -37,7 +37,7 @@ export default function SellerPage() {
   useEffect(() => {
     if (!ready) return;
     if (!customer) {
-      router.replace("/login?next=/seller");
+      router.replace("/seller/login?next=/seller");
       return;
     }
     if (customer.role !== "seller" && customer.role !== "admin") {
