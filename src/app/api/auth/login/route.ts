@@ -40,22 +40,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Always sync seeded admin/seller rows from env when that email is attempted,
-    // so Cursor SEED_* secrets create/update the account before password check.
-    const seedEmailAttempt =
-      matchesSeedAdminCredentials(email, password) ||
-      matchesSeedSellerCredentials(email, password) ||
-      email === (process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "") ||
-      email === (process.env.SEED_SELLER_EMAIL?.trim().toLowerCase() ?? "");
-
-    if (seedEmailAttempt) {
-      await forceReseedRoleAccounts();
-    }
-
     let user = await getUserByEmail(email);
     let passwordOk = user ? await verifyPassword(password, user.passwordHash) : false;
 
-    // Retry once if typed password matches SEED_* after sync.
+    // Only reseed when the full demo email+password match (never on wrong password).
     if (
       !passwordOk &&
       (matchesSeedAdminCredentials(email, password) ||

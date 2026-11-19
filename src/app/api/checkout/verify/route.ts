@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getRequestUser } from "@/lib/auth";
 import { getShopOrder, markOrderPaid } from "@/lib/orders";
 import { fetchCashfreeOrderStatus } from "@/lib/payments";
+import { rateLimit } from "@/lib/rateLimit";
 import { ensureSeeded } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,14 @@ export async function GET(request: Request) {
   const user = await getRequestUser();
   if (!user) {
     return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+
+  const limited = rateLimit(`checkout-verify:${user.id}`, 20, 60_000);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: `Too many payment checks. Try again in ${limited.retryAfterSec}s.` },
+      { status: 429 },
+    );
   }
 
   const orderId = new URL(request.url).searchParams.get("order_id")?.trim();
