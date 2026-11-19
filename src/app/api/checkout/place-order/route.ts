@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getRequestUser, newId } from "@/lib/auth";
 import { applyCoupon } from "@/data/coupons";
 import { sql } from "@/lib/db";
+import { safeAppOrigin } from "@/lib/appOrigin";
 import {
   cashfreeMode,
   isOnlinePaymentConfigured,
@@ -157,9 +158,7 @@ export async function POST(request: Request) {
     const eta = new Date();
     eta.setDate(eta.getDate() + 4);
 
-    const origin =
-      (body.returnOrigin || "").replace(/\/$/, "") ||
-      new URL(request.url).origin;
+    const origin = safeAppOrigin(request, body.returnOrigin);
     const returnUrl = `${origin}/checkout/return?order_id={order_id}`;
     const notifyUrl = `${origin}/api/webhooks/cashfree`;
 

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { ProductCard } from "@/components/ProductCard";
+import { useCatalog } from "@/context/CatalogContext";
 import { useShop } from "@/context/ShopContext";
-import { getProduct } from "@/data/products";
 
 export default function WishlistPage() {
   const { wishlist, ready } = useShop();
+  const { getProduct } = useCatalog();
   const items = wishlist.map((id) => getProduct(id)).filter(Boolean);
 
   if (!ready) return <div className="section text-ink/50">Loading wishlist…</div>;

@@ -3,13 +3,14 @@
 import { useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ProductCard } from "@/components/ProductCard";
+import { useCatalog } from "@/context/CatalogContext";
 import { categoryMeta, categoryOrder } from "@/data/categories";
-import { products } from "@/data/products";
 import type { Category } from "@/types";
 
 export function ProductsClient() {
   const params = useSearchParams();
   const router = useRouter();
+  const { products, ready } = useCatalog();
   const q = params.get("q") ?? "";
   const category = params.get("category") ?? "";
   const tag = params.get("tag") ?? "";
@@ -41,7 +42,7 @@ export function ProductsClient() {
     else if (sort === "price-desc") list.sort((a, b) => b.price - a.price);
     else if (sort === "rating") list.sort((a, b) => b.rating - a.rating);
     return list;
-  }, [category, tag, q, sort, fulfillment]);
+  }, [products, category, tag, q, sort, fulfillment]);
 
   function setParam(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
@@ -58,13 +59,17 @@ export function ProductsClient() {
         ? `Results for “${q}”`
         : "All products";
 
+  if (!ready) {
+    return <div className="section text-ink/50">Loading catalog…</div>;
+  }
+
   return (
     <div className="section !pt-8">
       <div className="mb-6">
         <p className="text-xs uppercase tracking-[0.2em] text-lagoon">Catalog</p>
         <h1 className="mt-1 font-display text-4xl text-ink">{title}</h1>
         <p className="mt-2 text-ink/60">
-          {filtered.length} item{filtered.length === 1 ? "" : "s"} · prices in ₹ · sample demo catalog
+          {filtered.length} item{filtered.length === 1 ? "" : "s"} · live from database · prices in ₹
         </p>
       </div>
 

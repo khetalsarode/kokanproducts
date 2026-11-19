@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ProductArt } from "@/components/ProductArt";
+import { useCatalog } from "@/context/CatalogContext";
 import { useShop } from "@/context/ShopContext";
 import { applyCoupon, coupons } from "@/data/coupons";
-import { getProduct } from "@/data/products";
 import { formatINR } from "@/lib/format";
+import type { Product } from "@/types";
 
 export default function CartPage() {
   const { cart, setQty, removeFromCart, cartSubtotal, ready } = useShop();
+  const { getProduct } = useCatalog();
   const [code, setCode] = useState("");
   const [applied, setApplied] = useState<{ code: string; discount: number } | null>(null);
   const [couponMsg, setCouponMsg] = useState("");
@@ -22,8 +24,8 @@ export default function CartPage() {
           if (!product) return null;
           return { item, product };
         })
-        .filter(Boolean) as { item: (typeof cart)[0]; product: NonNullable<ReturnType<typeof getProduct>> }[],
-    [cart],
+        .filter(Boolean) as { item: (typeof cart)[0]; product: Product }[],
+    [cart, getProduct],
   );
 
   const discount = applied?.discount ?? 0;

@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
+import { useCatalog } from "@/context/CatalogContext";
 import { applyCoupon } from "@/data/coupons";
-import { getProduct } from "@/data/products";
 import { formatINR } from "@/lib/format";
 import type { Address, Order } from "@/types";
 
@@ -50,6 +50,7 @@ function CheckoutInner() {
   const search = useSearchParams();
   const { customer } = useAuth();
   const { cart, cartSubtotal, addresses, clearCart, ready, setFlash, saveAddress } = useShop();
+  const { getProduct } = useCatalog();
   const couponFromUrl = search.get("coupon") ?? "";
   const [addressId, setAddressId] = useState("");
   const [payment, setPayment] = useState<CheckoutPay>("cod");

@@ -1,16 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
+import { HomeBestsellers, HomeFeatured } from "@/components/HomeCatalog";
 import { HomeSlider } from "@/components/HomeSlider";
-import { ProductCard } from "@/components/ProductCard";
 import { categoryMeta, categoryOrder } from "@/data/categories";
-import { products } from "@/data/products";
 import { categoryImage, sectionImages } from "@/lib/productImages";
 
 export default function HomePage() {
-  const bestsellers = products.filter((p) => p.tags.includes("bestseller")).slice(0, 8);
-  const featured = products.slice(0, 4);
-
   return (
     <>
       <section className="hero-shell">
@@ -92,11 +88,7 @@ export default function HomePage() {
             The jars and pouches Konkan kitchens reorder — solkadhi, hapus, cashews, and masalas.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
-          {bestsellers.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+        <HomeBestsellers />
       </section>
 
       <section className="relative overflow-hidden border-y border-sea/10 text-foam">
@@ -133,20 +125,7 @@ export default function HomePage() {
       </section>
 
       <section className="section">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-lagoon">Fresh picks</p>
-            <h2 className="mt-1 font-display text-3xl text-ink">Just landed</h2>
-          </div>
-          <Link href="/register" className="text-sm font-medium text-sea hover:underline">
-            Create account →
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
-          {featured.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+        <HomeFeatured />
       </section>
     </>
   );

@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [tab, setTab] = useState<"orders" | "products" | "users">("orders");
   const [form, setForm] = useState({
+    id: "",
     name: "",
     shortName: "",
     category: "cashews",
@@ -87,6 +88,7 @@ export default function AdminPage() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        id: form.id || undefined,
         name: form.name,
         shortName: form.shortName || form.name,
         category: form.category,
@@ -98,8 +100,37 @@ export default function AdminPage() {
         fulfillment: "internal",
       }),
     });
-    setMsg(res.ok ? "Product saved." : "Could not save product.");
+    setMsg(res.ok ? (form.id ? "Product updated." : "Product saved.") : "Could not save product.");
+    if (res.ok) {
+      setForm({
+        id: "",
+        name: "",
+        shortName: "",
+        category: "cashews",
+        price: "299",
+        mrp: "349",
+        stock: "20",
+        imageUrl: "",
+        description: "",
+      });
+    }
     await load();
+  }
+
+  function editProduct(p: Product) {
+    setForm({
+      id: p.id,
+      name: p.name,
+      shortName: p.shortName,
+      category: p.category,
+      price: String(p.price),
+      mrp: String(p.mrp),
+      stock: String(p.stock),
+      imageUrl: p.images[0] || "",
+      description: p.description,
+    });
+    setTab("products");
+    setMsg(`Editing ${p.name}`);
   }
 
   if (!ready || !customer || customer.role !== "admin") {
@@ -168,7 +199,12 @@ export default function AdminPage() {
       {tab === "products" && (
         <div className="mt-8 grid gap-8 lg:grid-cols-2">
           <form onSubmit={onAddProduct} className="grid gap-3 rounded-sm bg-white/55 p-4">
-            <h2 className="font-display text-xl">Add / update product</h2>
+            <h2 className="font-display text-xl">
+              {form.id ? "Update product" : "Add product"}
+            </h2>
+            <p className="text-xs text-ink/50">
+              Changes save to the database and show on the shop immediately.
+            </p>
             <input className="field" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <input className="field" placeholder="Short name" value={form.shortName} onChange={(e) => setForm({ ...form, shortName: e.target.value })} />
             <input className="field" placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
@@ -180,17 +216,42 @@ export default function AdminPage() {
             <input className="field" placeholder="Image URL (/products/...)" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} />
             <textarea className="field" placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
             {msg && <p className="text-sm text-lagoon">{msg}</p>}
-            <button type="submit" className="btn-primary w-fit">Save product</button>
+            <div className="flex flex-wrap gap-2">
+              <button type="submit" className="btn-primary w-fit">
+                {form.id ? "Update product" : "Save product"}
+              </button>
+              {form.id && (
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() =>
+                    setForm({
+                      id: "",
+                      name: "",
+                      shortName: "",
+                      category: "cashews",
+                      price: "299",
+                      mrp: "349",
+                      stock: "20",
+                      imageUrl: "",
+                      description: "",
+                    })
+                  }
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </form>
           <ul className="space-y-2 text-sm">
             {products.map((p) => (
               <li key={p.id} className="flex justify-between gap-2 rounded-sm border border-sea/10 bg-white/40 px-3 py-2">
-                <span>
+                <button type="button" className="text-left" onClick={() => editProduct(p)}>
                   {p.name}
                   <span className="block text-xs text-ink/45">
-                    {formatINR(p.price)} · stock {p.stock}
+                    {formatINR(p.price)} · stock {p.stock} · click to edit
                   </span>
-                </span>
+                </button>
                 <button
                   type="button"
                   className="text-spice hover:underline"
