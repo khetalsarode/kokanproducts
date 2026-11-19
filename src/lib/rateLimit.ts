@@ -1,8 +1,12 @@
 type Bucket = { count: number; resetAt: number };
 
+/**
+ * Per-process in-memory limiter.
+ * Note: limits reset per server instance and are not shared across replicas.
+ * Prefer a durable store (Redis/DB) if multi-instance abuse becomes a concern.
+ */
 const buckets = new Map<string, Bucket>();
 
-/** Simple in-memory limiter (per server instance). */
 export function rateLimit(
   key: string,
   limit: number,

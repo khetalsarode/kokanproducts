@@ -38,7 +38,7 @@ type AuthContextValue = {
     email: string;
     phone: string;
     password: string;
-    role?: AuthRole;
+    role?: "customer" | "seller";
     shopName?: string;
     location?: string;
   }) => Promise<string | null>;
@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       phone: string;
       password: string;
-      role?: AuthRole;
+      role?: "customer" | "seller";
       shopName?: string;
       location?: string;
     }) => {

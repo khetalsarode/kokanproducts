@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { ensureSeeded, seedAdminConfigured } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
-/** Non-sensitive diagnostics: whether admin seed env is present and if that user row exists. */
+/** Admin-only diagnostics: whether admin seed env is present and if that user row exists. */
 export async function GET() {
   await ensureSeeded();
+  const user = await requireUser(["admin"]);
+  if (user instanceof NextResponse) return user;
+
   const configured = seedAdminConfigured();
   const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
   let adminPresent = false;
