@@ -1,7 +1,9 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ProductCard } from "@/components/ProductCard";
 import { categoryMeta, categoryOrder } from "@/data/categories";
 import { products } from "@/data/products";
+import { categoryImage, sectionImages } from "@/lib/productImages";
 
 export default function HomePage() {
   const bestsellers = products.filter((p) => p.tags.includes("bestseller")).slice(0, 8);
@@ -10,7 +12,16 @@ export default function HomePage() {
   return (
     <>
       <section className="hero-shell">
-        <div className="hero-bg" />
+        <div className="hero-bg">
+          <Image
+            src={sectionImages.hero}
+            alt="Konkan coastline"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+        </div>
         <div className="relative z-10 mx-auto flex min-h-[inherit] max-w-6xl flex-col justify-end px-4 pb-16 pt-28 sm:px-6 sm:pb-20 sm:pt-32">
           <p className="reveal text-xs uppercase tracking-[0.28em] text-mango">
             Direct from the Konkan coast
@@ -42,11 +53,27 @@ export default function HomePage() {
             View all →
           </Link>
         </div>
-        <div className="mt-6 flex gap-3 overflow-x-auto pb-2">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {categoryOrder.map((key) => (
-            <Link key={key} href={`/products?category=${key}`} className="chip shrink-0">
-              <span aria-hidden>{categoryMeta[key].emoji}</span>
-              {categoryMeta[key].label}
+            <Link
+              key={key}
+              href={`/products?category=${key}`}
+              className="group relative overflow-hidden rounded-sm"
+            >
+              <div className="relative h-28 w-full sm:h-36">
+                <Image
+                  src={categoryImage(key)}
+                  alt={categoryMeta[key].label}
+                  fill
+                  sizes="(max-width: 640px) 50vw, 25vw"
+                  className="object-cover transition duration-500 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-sea/85 via-sea/25 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-3">
+                  <p className="font-display text-lg text-foam">{categoryMeta[key].label}</p>
+                  <p className="text-[11px] text-foam/75">{categoryMeta[key].blurb}</p>
+                </div>
+              </div>
             </Link>
           ))}
         </div>
@@ -67,8 +94,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="relative overflow-hidden border-y border-sea/10 bg-sea/95 text-foam">
-        <div className="absolute inset-0 opacity-30 wave-overlay" />
+      <section className="relative overflow-hidden border-y border-sea/10 text-foam">
+        <div className="absolute inset-0">
+          <Image
+            src={sectionImages.why}
+            alt="Coastal waters"
+            fill
+            sizes="100vw"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-sea/88" />
+        </div>
         <div className="section relative grid gap-8 md:grid-cols-[1.2fr_1fr] md:items-center">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-mango">Why KokanProducts</p>
@@ -79,20 +115,15 @@ export default function HomePage() {
               We source from Ratnagiri, Devgad, Malvan, and Alibag — then fulfil from our own stock or ship direct from verified sellers. FSSAI-aligned listings. Clear tracking. Honest coastal flavours.
             </p>
           </div>
-          <ul className="space-y-4 text-sm">
-            <li className="border-l-2 border-mango pl-4">
-              <strong className="block text-foam">Direct from source</strong>
-              <span className="text-foam/65">Orchards, co-ops & coastal kitchens — not generic warehouses.</span>
-            </li>
-            <li className="border-l-2 border-mango pl-4">
-              <strong className="block text-foam">Internal + marketplace</strong>
-              <span className="text-foam/65">See who packs each order on the product page.</span>
-            </li>
-            <li className="border-l-2 border-mango pl-4">
-              <strong className="block text-foam">Pay your way</strong>
-              <span className="text-foam/65">UPI, cards, wallets, or cash on delivery (demo checkout).</span>
-            </li>
-          </ul>
+          <div className="relative hidden h-56 overflow-hidden rounded-sm md:block">
+            <Image
+              src={sectionImages.farm}
+              alt="Farm fields"
+              fill
+              sizes="40vw"
+              className="object-cover"
+            />
+          </div>
         </div>
       </section>
 
@@ -102,6 +133,9 @@ export default function HomePage() {
             <p className="text-xs uppercase tracking-[0.2em] text-lagoon">Fresh picks</p>
             <h2 className="mt-1 font-display text-3xl text-ink">Just landed</h2>
           </div>
+          <Link href="/register" className="text-sm font-medium text-sea hover:underline">
+            Create account →
+          </Link>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
           {featured.map((p) => (

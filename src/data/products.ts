@@ -1,4 +1,5 @@
 import type { Product } from "@/types";
+import { productImages } from "@/lib/productImages";
 import { getSeller } from "./sellers";
 
 export const products: Product[] = [
@@ -22,6 +23,7 @@ export const products: Product[] = [
     tags: ["bestseller", "fssai", "vegan"],
     accent: "#8B1E5E",
     imageHint: "kokum syrup",
+    images: productImages("solkadhi-kokum-concentrate"),
     fssai: true,
     reviews: [
       {
@@ -60,6 +62,7 @@ export const products: Product[] = [
     tags: ["pantry", "fssai"],
     accent: "#A12A6A",
     imageHint: "dried kokum",
+    images: productImages("dried-kokum-petals"),
     fssai: true,
     reviews: [
       {
@@ -91,6 +94,7 @@ export const products: Product[] = [
     tags: ["summer", "drink"],
     accent: "#9C2F70",
     imageHint: "sherbet",
+    images: productImages("kokum-sherbet-mix"),
     fssai: true,
     reviews: [
       {
@@ -122,6 +126,7 @@ export const products: Product[] = [
     tags: ["bestseller", "seasonal", "fssai"],
     accent: "#E8A317",
     imageHint: "mango pulp",
+    images: productImages("devgad-hapus-pulp"),
     fssai: true,
     reviews: [
       {
@@ -160,6 +165,7 @@ export const products: Product[] = [
     tags: ["spicy", "fssai"],
     accent: "#C45C26",
     imageHint: "mango pickle",
+    images: productImages("kairi-pickle"),
     fssai: true,
     reviews: [
       {
@@ -191,6 +197,7 @@ export const products: Product[] = [
     tags: ["snack", "kids"],
     accent: "#F0B429",
     imageHint: "dried mango",
+    images: productImages("dried-hapus-slices"),
     fssai: true,
     reviews: [
       {
@@ -222,6 +229,7 @@ export const products: Product[] = [
     tags: ["bestseller", "pantry", "fssai"],
     accent: "#3D8B6E",
     imageHint: "coconut oil",
+    images: productImages("cold-pressed-coconut-oil"),
     fssai: true,
     reviews: [
       {
@@ -253,6 +261,7 @@ export const products: Product[] = [
     tags: ["sweetener", "traditional"],
     accent: "#8B5A2B",
     imageHint: "jaggery",
+    images: productImages("coconut-jaggery"),
     fssai: true,
     reviews: [
       {
@@ -284,6 +293,7 @@ export const products: Product[] = [
     tags: ["pantry", "fermented"],
     accent: "#2F6B5A",
     imageHint: "vinegar",
+    images: productImages("coconut-vinegar"),
     fssai: true,
     reviews: [
       {
@@ -315,6 +325,7 @@ export const products: Product[] = [
     tags: ["snack", "vegan"],
     accent: "#5C9E7E",
     imageHint: "chips",
+    images: productImages("roasted-coconut-chips"),
     fssai: true,
     reviews: [
       {
@@ -346,6 +357,7 @@ export const products: Product[] = [
     tags: ["bestseller", "spicy", "fssai"],
     accent: "#B33A1A",
     imageHint: "masala",
+    images: productImages("malvani-fish-masala"),
     fssai: true,
     reviews: [
       {
@@ -377,6 +389,7 @@ export const products: Product[] = [
     tags: ["chicken", "weekend"],
     accent: "#C94C1E",
     imageHint: "chicken masala",
+    images: productImages("kombdi-vade-masala"),
     fssai: true,
     reviews: [
       {
@@ -408,6 +421,7 @@ export const products: Product[] = [
     tags: ["rare", "foraged"],
     accent: "#6B4C2A",
     imageHint: "tirphal",
+    images: productImages("tirphal-berries"),
     fssai: true,
     reviews: [
       {
@@ -439,6 +453,7 @@ export const products: Product[] = [
     tags: ["everyday", "convenience"],
     accent: "#A85A1C",
     imageHint: "tadka",
+    images: productImages("phodni-masala"),
     fssai: true,
     reviews: [
       {
@@ -470,6 +485,7 @@ export const products: Product[] = [
     tags: ["bestseller", "seafood"],
     accent: "#1F5C6B",
     imageHint: "bombil",
+    images: productImages("dried-bombil"),
     fssai: true,
     reviews: [
       {
@@ -501,6 +517,7 @@ export const products: Product[] = [
     tags: ["umami", "seafood"],
     accent: "#C45B3A",
     imageHint: "prawns",
+    images: productImages("dried-prawns"),
     fssai: true,
     reviews: [
       {
@@ -532,6 +549,7 @@ export const products: Product[] = [
     tags: ["spicy", "seafood", "bestseller"],
     accent: "#8B2E1A",
     imageHint: "fish pickle",
+    images: productImages("bangda-pickle"),
     fssai: true,
     reviews: [
       {
@@ -563,6 +581,7 @@ export const products: Product[] = [
     tags: ["ready-to-eat", "spicy"],
     accent: "#A63D2A",
     imageHint: "balchao",
+    images: productImages("prawn-balchao"),
     fssai: true,
     reviews: [
       {
@@ -594,6 +613,7 @@ export const products: Product[] = [
     tags: ["festival", "sweet"],
     accent: "#D4A017",
     imageHint: "modak",
+    images: productImages("ukadiche-modak-mix"),
     fssai: true,
     reviews: [
       {
@@ -625,6 +645,7 @@ export const products: Product[] = [
     tags: ["gift", "no-sugar"],
     accent: "#6B3A2A",
     imageHint: "dates",
+    images: productImages("khajur-rolls"),
     fssai: true,
     reviews: [
       {
@@ -656,6 +677,7 @@ export const products: Product[] = [
     tags: ["snack", "winter"],
     accent: "#C9A227",
     imageHint: "chikki",
+    images: productImages("til-gud-chikki"),
     fssai: true,
     reviews: [
       {
@@ -687,6 +709,7 @@ export const products: Product[] = [
     tags: ["chilled", "dessert"],
     accent: "#F5E6A8",
     imageHint: "shrikhand",
+    images: productImages("shrikhand-elaichi"),
     fssai: true,
     reviews: [
       {
@@ -718,6 +741,7 @@ export const products: Product[] = [
     tags: ["staple", "bestseller"],
     accent: "#A67C52",
     imageHint: "rice",
+    images: productImages("ukda-rice"),
     fssai: true,
     reviews: [
       {
@@ -749,6 +773,7 @@ export const products: Product[] = [
     tags: ["baking", "vade"],
     accent: "#B8956A",
     imageHint: "flour",
+    images: productImages("ukda-rice-flour"),
     fssai: true,
     reviews: [
       {
@@ -780,6 +805,7 @@ export const products: Product[] = [
     tags: ["healthy", "breakfast"],
     accent: "#7A5C3E",
     imageHint: "nachni",
+    images: productImages("nachni-flour"),
     fssai: true,
     reviews: [
       {
@@ -811,6 +837,7 @@ export const products: Product[] = [
     tags: ["wild", "tangy"],
     accent: "#6B2D5B",
     imageHint: "karvand",
+    images: productImages("karvand-pickle"),
     fssai: true,
     reviews: [
       {
@@ -842,6 +869,7 @@ export const products: Product[] = [
     tags: ["mild", "everyday"],
     accent: "#3F7A4E",
     imageHint: "tendli",
+    images: productImages("tendli-pickle"),
     fssai: true,
     reviews: [
       {
@@ -873,6 +901,7 @@ export const products: Product[] = [
     tags: ["kit", "gift", "bestseller"],
     accent: "#7A1F55",
     imageHint: "kit",
+    images: productImages("sol-kadhi-kit"),
     fssai: true,
     reviews: [
       {
@@ -904,6 +933,7 @@ export const products: Product[] = [
     tags: ["specialty", "fermented"],
     accent: "#C4A35A",
     imageHint: "cashew vinegar",
+    images: productImages("cashew-feni-vinegar"),
     fssai: true,
     reviews: [
       {
@@ -935,6 +965,7 @@ export const products: Product[] = [
     tags: ["snack", "seasonal"],
     accent: "#E0B84A",
     imageHint: "jackfruit",
+    images: productImages("jackfruit-chips"),
     fssai: true,
     reviews: [
       {
@@ -966,6 +997,7 @@ export const products: Product[] = [
     tags: ["sweetener", "healthy"],
     accent: "#9C6B3C",
     imageHint: "coconut sugar",
+    images: productImages("coconut-sugar"),
     fssai: true,
     reviews: [
       {
@@ -997,6 +1029,7 @@ export const products: Product[] = [
     tags: ["nostalgia", "kids", "bestseller"],
     accent: "#E89B2D",
     imageHint: "ambapoli",
+    images: productImages("ambapoli"),
     fssai: true,
     reviews: [
       {

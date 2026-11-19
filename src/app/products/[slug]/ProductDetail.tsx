@@ -19,6 +19,7 @@ export function ProductDetail({
 }) {
   const { addToCart, toggleWishlist, isWishlisted } = useShop();
   const [qty, setQty] = useState(1);
+  const [imageIndex, setImageIndex] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
   const seller = getSeller(product.sellerId);
   const off = discountPercent(product.price, product.mrp);
@@ -46,7 +47,37 @@ export function ProductDetail({
       </nav>
 
       <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-        <ProductArt product={product} size="lg" className="rounded-sm !h-[22rem] sm:!h-[28rem]" />
+        <div>
+          <ProductArt
+            product={product}
+            size="lg"
+            imageIndex={imageIndex}
+            priority
+            className="rounded-sm !h-[22rem] sm:!h-[28rem]"
+          />
+          {product.images.length > 1 && (
+            <div className="mt-3 flex gap-2">
+              {product.images.map((_, idx) => (
+                <button
+                  key={product.images[idx]}
+                  type="button"
+                  onClick={() => setImageIndex(idx)}
+                  className={`overflow-hidden rounded-sm border-2 transition ${
+                    imageIndex === idx ? "border-sea" : "border-transparent opacity-80 hover:opacity-100"
+                  }`}
+                  aria-label={`View photo ${idx + 1}`}
+                >
+                  <ProductArt
+                    product={product}
+                    size="sm"
+                    imageIndex={idx}
+                    className="!h-16 !w-16"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-lagoon">{product.category}</p>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
 
 const links = [
@@ -16,6 +17,7 @@ const links = [
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
+  const { customer, ready: authReady } = useAuth();
   const { cartCount, wishlist, ready } = useShop();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -60,9 +62,15 @@ export function Header() {
             ♡<span className="sr-only">Wishlist</span>
             {showWishCount && <em>{wishlist.length}</em>}
           </Link>
-          <Link href="/account" className="hidden text-ink/70 hover:text-sea sm:inline">
-            Account
-          </Link>
+          {authReady && customer ? (
+            <Link href="/account" className="hidden text-ink/70 hover:text-sea sm:inline">
+              {customer.name.split(" ")[0]}
+            </Link>
+          ) : (
+            <Link href="/login" className="hidden text-ink/70 hover:text-sea sm:inline">
+              Sign in
+            </Link>
+          )}
           <Link href="/cart" className="nav-icon" aria-label="Cart">
             Bag
             {showCartCount && <em>{cartCount}</em>}
@@ -89,9 +97,12 @@ export function Header() {
               </Link>
             );
           })}
-          <span className="ml-auto text-xs text-ink/40 self-center">
-            Seller / Admin portals — coming soon
-          </span>
+          <Link
+            href="/register"
+            className="ml-auto self-center text-xs font-medium text-spice hover:underline"
+          >
+            Create account
+          </Link>
         </nav>
       </div>
       {open && (
@@ -117,6 +128,12 @@ export function Header() {
             ))}
             <Link href="/account" onClick={() => setOpen(false)} className="py-1 text-sea">
               Account
+            </Link>
+            <Link href="/login" onClick={() => setOpen(false)} className="py-1 text-sea">
+              Sign in
+            </Link>
+            <Link href="/register" onClick={() => setOpen(false)} className="py-1 text-sea">
+              Create account
             </Link>
             <Link href="/returns" onClick={() => setOpen(false)} className="py-1 text-sea">
               Returns

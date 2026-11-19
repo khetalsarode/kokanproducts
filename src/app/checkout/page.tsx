@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
 import { applyCoupon } from "@/data/coupons";
 import { getProduct } from "@/data/products";
@@ -19,6 +20,7 @@ const payments: { id: PaymentMethod; label: string; hint: string }[] = [
 function CheckoutInner() {
   const router = useRouter();
   const search = useSearchParams();
+  const { customer } = useAuth();
   const { cart, cartSubtotal, addresses, placeOrder, ready } = useShop();
   const couponFromUrl = search.get("coupon") ?? "";
   const [addressId, setAddressId] = useState(addresses.find((a) => a.isDefault)?.id ?? addresses[0]?.id ?? "");
@@ -72,6 +74,19 @@ function CheckoutInner() {
       <p className="mt-2 text-sm text-ink/55">
         Mock payment UI — structured for Razorpay-class gateway later. No live charges.
       </p>
+      {!customer && (
+        <p className="mt-4 rounded-sm border border-sea/15 bg-white/55 px-4 py-3 text-sm text-ink/70">
+          Guest checkout is fine.{" "}
+          <Link href="/login?next=/checkout" className="font-medium text-sea hover:underline">
+            Sign in
+          </Link>{" "}
+          or{" "}
+          <Link href="/register" className="font-medium text-sea hover:underline">
+            create an account
+          </Link>{" "}
+          to keep this order in your account history.
+        </p>
+      )}
 
       <form onSubmit={submit} className="mt-8 grid gap-10 lg:grid-cols-[1.3fr_0.9fr]">
         <div className="space-y-8">

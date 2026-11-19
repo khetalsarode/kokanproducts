@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,6 +14,7 @@ import { applyCoupon } from "@/data/coupons";
 import { defaultAddresses } from "@/data/addresses";
 import { getProduct, products } from "@/data/products";
 import { getSeller } from "@/data/sellers";
+import { useAuth } from "@/context/AuthContext";
 import type {
   Address,
   CartItem,
@@ -85,20 +87,109 @@ function makeTrackingId(): string {
 }
 
 export function ShopProvider({ children }: { children: ReactNode }) {
+  const { ready: authReady, customer } = useAuth();
   const [ready, setReady] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>(defaultAddresses);
   const [flash, setFlash] = useState<string | null>(null);
+  const accountSynced = useRef<string | null>(null);
+  const skipWishPersist = useRef(false);
+  const skipAddrPersist = useRef(false);
+  const skipOrderPersist = useRef(false);
 
   useEffect(() => {
     setCart(loadJSON(CART_KEY, []));
-    setWishlist(loadJSON(WISH_KEY, []));
-    setOrders(loadJSON(ORDERS_KEY, []));
-    setAddresses(loadJSON(ADDR_KEY, defaultAddresses));
-    setReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+    let cancelled = false;
+
+    async function hydrate() {
+      if (!customer) {
+        accountSynced.current = null;
+        skipWishPersist.current = true;
+        skipAddrPersist.current = true;
+        skipOrderPersist.current = true;
+        setWishlist(loadJSON(WISH_KEY, []));
+        setOrders(loadJSON(ORDERS_KEY, []));
+        setAddresses(loadJSON(ADDR_KEY, defaultAddresses));
+        setReady(true);
+        queueMicrotask(() => {
+          skipWishPersist.current = false;
+          skipAddrPersist.current = false;
+          skipOrderPersist.current = false;
+        });
+        return;
+      }
+
+      if (accountSynced.current === customer.id) {
+        setReady(true);
+        return;
+      }
+
+      try {
+        const guestWish = loadJSON<string[]>(WISH_KEY, []);
+        const [wishRes, addrRes, orderRes] = await Promise.all([
+          fetch("/api/account/wishlist", { cache: "no-store" }),
+          fetch("/api/account/addresses", { cache: "no-store" }),
+          fetch("/api/account/orders", { cache: "no-store" }),
+        ]);
+        if (cancelled) return;
+
+        const wishData = wishRes.ok
+          ? ((await wishRes.json()) as { wishlist: string[] })
+          : { wishlist: [] };
+        const addrData = addrRes.ok
+          ? ((await addrRes.json()) as { addresses: Address[] })
+          : { addresses: [] };
+        const orderData = orderRes.ok
+          ? ((await orderRes.json()) as { orders: Order[] })
+          : { orders: [] };
+
+        const mergedWish = [...new Set([...wishData.wishlist, ...guestWish])];
+        skipWishPersist.current = true;
+        skipAddrPersist.current = true;
+        skipOrderPersist.current = true;
+        setWishlist(mergedWish);
+        setAddresses(
+          addrData.addresses.length > 0 ? addrData.addresses : defaultAddresses,
+        );
+        setOrders(orderData.orders);
+        accountSynced.current = customer.id;
+
+        if (mergedWish.length !== wishData.wishlist.length) {
+          await fetch("/api/account/wishlist", {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ wishlist: mergedWish }),
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setWishlist(loadJSON(WISH_KEY, []));
+          setOrders(loadJSON(ORDERS_KEY, []));
+          setAddresses(loadJSON(ADDR_KEY, defaultAddresses));
+        }
+      } finally {
+        if (!cancelled) {
+          setReady(true);
+          queueMicrotask(() => {
+            skipWishPersist.current = false;
+            skipAddrPersist.current = false;
+            skipOrderPersist.current = false;
+          });
+        }
+      }
+    }
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, customer]);
 
   useEffect(() => {
     if (!ready) return;
@@ -106,19 +197,32 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   }, [cart, ready]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || skipWishPersist.current) return;
     localStorage.setItem(WISH_KEY, JSON.stringify(wishlist));
-  }, [wishlist, ready]);
+    if (!customer) return;
+    const t = window.setTimeout(() => {
+      void fetch("/api/account/wishlist", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ wishlist }),
+      });
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [wishlist, ready, customer]);
 
   useEffect(() => {
-    if (!ready) return;
-    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-  }, [orders, ready]);
+    if (!ready || skipOrderPersist.current) return;
+    if (!customer) {
+      localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+    }
+  }, [orders, ready, customer]);
 
   useEffect(() => {
-    if (!ready) return;
-    localStorage.setItem(ADDR_KEY, JSON.stringify(addresses));
-  }, [addresses, ready]);
+    if (!ready || skipAddrPersist.current) return;
+    if (!customer) {
+      localStorage.setItem(ADDR_KEY, JSON.stringify(addresses));
+    }
+  }, [addresses, ready, customer]);
 
   useEffect(() => {
     if (!flash) return;
@@ -250,9 +354,16 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       setOrders((prev) => [order, ...prev]);
       setCart([]);
       setFlash(`Order ${order.id} placed`);
+      if (customer) {
+        void fetch("/api/account/orders", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ order }),
+        });
+      }
       return order;
     },
-    [addresses, cart, cartSubtotal],
+    [addresses, cart, cartSubtotal, customer],
   );
 
   const getOrder = useCallback(
@@ -260,33 +371,63 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     [orders],
   );
 
-  const advanceOrderDemo = useCallback((id: string) => {
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id !== id) return o;
-        const idx = STATUS_FLOW.indexOf(o.status);
-        if (idx < 0 || idx >= STATUS_FLOW.length - 1) return o;
-        return { ...o, status: STATUS_FLOW[idx + 1] };
-      }),
-    );
-  }, []);
+  const advanceOrderDemo = useCallback(
+    (id: string) => {
+      setOrders((prev) => {
+        const next = prev.map((o) => {
+          if (o.id !== id) return o;
+          const idx = STATUS_FLOW.indexOf(o.status);
+          if (idx < 0 || idx >= STATUS_FLOW.length - 1) return o;
+          return { ...o, status: STATUS_FLOW[idx + 1] };
+        });
+        const updated = next.find((o) => o.id === id);
+        if (customer && updated) {
+          void fetch("/api/account/orders", {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ order: updated }),
+          });
+        }
+        return next;
+      });
+    },
+    [customer],
+  );
 
-  const saveAddress = useCallback((address: Address) => {
-    setAddresses((prev) => {
-      const exists = prev.some((a) => a.id === address.id);
-      if (exists) {
-        return prev.map((a) => (a.id === address.id ? address : a));
+  const saveAddress = useCallback(
+    (address: Address) => {
+      setAddresses((prev) => {
+        const exists = prev.some((a) => a.id === address.id);
+        if (exists) {
+          return prev.map((a) => (a.id === address.id ? address : a));
+        }
+        return [...prev, address];
+      });
+      if (customer) {
+        void fetch("/api/account/addresses", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(address),
+        });
       }
-      return [...prev, address];
-    });
-  }, []);
+    },
+    [customer],
+  );
 
-  const removeAddress = useCallback((id: string) => {
-    setAddresses((prev) => prev.filter((a) => a.id !== id));
-  }, []);
+  const removeAddress = useCallback(
+    (id: string) => {
+      setAddresses((prev) => prev.filter((a) => a.id !== id));
+      if (customer) {
+        void fetch(`/api/account/addresses?id=${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
+      }
+    },
+    [customer],
+  );
 
   const value: ShopContextValue = {
-    ready,
+    ready: ready && authReady,
     cart,
     wishlist,
     orders,

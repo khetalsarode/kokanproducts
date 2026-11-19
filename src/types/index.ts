@@ -44,6 +44,7 @@ export interface Product {
   tags: string[];
   accent: string;
   imageHint: string;
+  images: string[];
   fssai: boolean;
   reviews: Review[];
 }
