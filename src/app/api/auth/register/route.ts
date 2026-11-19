@@ -29,8 +29,21 @@ export async function POST(request: Request) {
     const email = (body.email ?? "").trim().toLowerCase();
     const phone = (body.phone ?? "").trim();
     const password = body.password ?? "";
-    const requested =
-      body.role === "seller" ? "seller" : body.role === "admin" ? "admin" : "customer";
+
+    // Public registration is customer or seller only. Admins come from SEED_ADMIN_*
+    // (or a future authenticated admin invite) — never open first-admin bootstrap.
+    if (body.role === "admin") {
+      return NextResponse.json(
+        {
+          error:
+            "Admin accounts cannot be self-registered. Use the seeded admin login.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const wantSeller = body.role === "seller";
+    const role: UserRole = wantSeller ? "seller" : "customer";
 
     const limited = rateLimit(`register:${email || "unknown"}`, 5, 60_000);
     if (!limited.ok) {
@@ -58,30 +71,9 @@ export async function POST(request: Request) {
         { status: 403 },
       );
     }
-
-    let role: UserRole = "customer";
-    if (requested === "seller") {
-      role = "seller";
-      if (!(body.shopName ?? "").trim()) {
-        return NextResponse.json({ error: "Enter your shop name." }, { status: 400 });
-      }
-    } else if (requested === "admin") {
-      // Bootstrap only: allow the first admin when none exist yet.
-      const admins = await sql<{ n: string | number }>(
-        `select count(*)::int as n from customers where role = 'admin'`,
-      );
-      if (Number(admins[0]?.n ?? 0) > 0) {
-        return NextResponse.json(
-          {
-            error:
-              "Admin registration is closed. Ask an existing admin or use a seeded admin account.",
-          },
-          { status: 403 },
-        );
-      }
-      role = "admin";
+    if (wantSeller && !(body.shopName ?? "").trim()) {
+      return NextResponse.json({ error: "Enter your shop name." }, { status: 400 });
     }
-
     if (await getUserByEmail(email)) {
       return NextResponse.json(
         { error: "An account with this email already exists." },
