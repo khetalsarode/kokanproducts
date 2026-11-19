@@ -104,23 +104,27 @@ export async function PATCH(request: Request) {
       typeof rows[0].items_json === "string"
         ? JSON.parse(rows[0].items_json)
         : rows[0].items_json;
-    const mine = Array.isArray(items)
-      ? items.some((i: { sellerName?: string }) => i.sellerName === user.id)
-      : false;
-    // Sellers may advance status on orders that include their products (approx via sellerName field)
-    if (!mine && user.role === "seller") {
-      // Also allow if any catalog product in order owned by seller
-      const owned = await sql<{ id: string }>(
-        `select id from catalog_products where seller_user_id = $1`,
-        [user.id],
+    const owned = await sql<{ id: string }>(
+      `select id from catalog_products where seller_user_id = $1`,
+      [user.id],
+    );
+    const ids = new Set(owned.map((o) => o.id));
+    // Seller may update status only when every line item is theirs.
+    const allMine =
+      Array.isArray(items) &&
+      items.length > 0 &&
+      items.every(
+        (i: { productId?: string; sellerName?: string }) =>
+          (i.productId && ids.has(i.productId)) || i.sellerName === user.id,
       );
-      const ids = new Set(owned.map((o) => o.id));
-      const has = Array.isArray(items)
-        ? items.some((i: { productId?: string }) => i.productId && ids.has(i.productId))
-        : false;
-      if (!has) {
-        return NextResponse.json({ error: "Forbidden." }, { status: 403 });
-      }
+    if (!allMine) {
+      return NextResponse.json(
+        {
+          error:
+            "Sellers can only update status on orders that contain solely their products.",
+        },
+        { status: 403 },
+      );
     }
   }
 

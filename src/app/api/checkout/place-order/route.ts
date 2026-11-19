@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { getRequestUser, newId } from "@/lib/auth";
 import { applyCoupon } from "@/data/coupons";
 import { sql } from "@/lib/db";
-import { isOnlinePaymentConfigured, startPayment } from "@/lib/payments";
+import {
+  cashfreeMode,
+  isOnlinePaymentConfigured,
+  startPayment,
+} from "@/lib/payments";
 import { rateLimit } from "@/lib/rateLimit";
 import { ensureSeeded } from "@/lib/seed";
 import type { Address, Fulfillment, Order, OrderLine, PaymentMethod } from "@/types";
@@ -28,7 +32,17 @@ type StockRow = {
   active: boolean;
 };
 
+async function restoreStock(lines: OrderLine[]) {
+  for (const line of lines) {
+    await sql(
+      `update catalog_products set stock = stock + $1, updated_at = now() where id = $2`,
+      [line.qty, line.productId],
+    );
+  }
+}
+
 export async function POST(request: Request) {
+  const reserved: OrderLine[] = [];
   try {
     await ensureSeeded();
     const user = await getRequestUser();
@@ -52,7 +66,7 @@ export async function POST(request: Request) {
       address?: Address;
       paymentMethod?: PaymentMethod | "online" | "cod";
       couponCode?: string;
-      discount?: number;
+      returnOrigin?: string;
     };
 
     const itemsIn = Array.isArray(body.items) ? body.items : [];
@@ -88,16 +102,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const lines: OrderLine[] = [];
     let subtotal = 0;
-
     for (const item of itemsIn) {
       const qty = Math.max(1, Math.min(99, Math.floor(Number(item.qty) || 0)));
       if (!item.productId || qty < 1) {
+        await restoreStock(reserved);
         return NextResponse.json({ error: "Invalid cart item." }, { status: 400 });
       }
 
-      // Atomic stock reservation — fails if another order took the units.
       const updated = await sql<StockRow>(
         `update catalog_products
          set stock = stock - $1, updated_at = now()
@@ -107,36 +119,31 @@ export async function POST(request: Request) {
       );
       const product = updated[0];
       if (!product) {
+        await restoreStock(reserved);
         return NextResponse.json(
           { error: `Insufficient stock for ${item.productId}.` },
           { status: 400 },
         );
       }
 
-      lines.push({
+      const line: OrderLine = {
         productId: product.id,
         name: product.name,
         qty,
         price: Number(product.price),
         fulfillment: (product.fulfillment as Fulfillment) || "internal",
         sellerName: product.seller_user_id || "kp-internal",
-      });
+      };
+      reserved.push(line);
       subtotal += Number(product.price) * qty;
     }
 
-    // Ignore client-supplied discount; recompute from coupon code only.
     let discount = 0;
     let couponCode: string | undefined;
     if (body.couponCode?.trim()) {
       const result = applyCoupon(body.couponCode, subtotal);
       if (!result.ok) {
-        // Roll back reserved stock
-        for (const line of lines) {
-          await sql(
-            `update catalog_products set stock = stock + $1, updated_at = now() where id = $2`,
-            [line.qty, line.productId],
-          );
-        }
+        await restoreStock(reserved);
         return NextResponse.json({ error: result.message }, { status: 400 });
       }
       discount = result.discount;
@@ -150,25 +157,42 @@ export async function POST(request: Request) {
     const eta = new Date();
     eta.setDate(eta.getDate() + 4);
 
-    const payment = await startPayment(method === "cod" ? "cod" : "online", {
-      orderId,
-      amountPaise: total * 100,
-      customer: {
-        id: user.id,
-        name: body.address.name,
-        email: user.email,
-        phone: body.address.phone,
-      },
-      method: method === "cod" ? "cod" : "online",
-    });
+    const origin =
+      (body.returnOrigin || "").replace(/\/$/, "") ||
+      new URL(request.url).origin;
+    const returnUrl = `${origin}/checkout/return?order_id={order_id}`;
+    const notifyUrl = `${origin}/api/webhooks/cashfree`;
 
-    if (method === "online" && !payment.redirectUrl) {
-      for (const line of lines) {
-        await sql(
-          `update catalog_products set stock = stock + $1, updated_at = now() where id = $2`,
-          [line.qty, line.productId],
-        );
-      }
+    let payment;
+    try {
+      payment = await startPayment(method === "cod" ? "cod" : "online", {
+        orderId,
+        amountInr: total,
+        customer: {
+          id: user.id,
+          name: body.address.name,
+          email: user.email,
+          phone: body.address.phone,
+        },
+        method: method === "cod" ? "cod" : "online",
+        returnUrl,
+        notifyUrl,
+      });
+    } catch (err) {
+      await restoreStock(reserved);
+      return NextResponse.json(
+        {
+          error:
+            err instanceof Error
+              ? err.message
+              : "Payment gateway could not create the session.",
+        },
+        { status: 502 },
+      );
+    }
+
+    if (method === "online" && !payment.paymentSessionId && !payment.redirectUrl) {
+      await restoreStock(reserved);
       return NextResponse.json(
         {
           error:
@@ -203,7 +227,7 @@ export async function POST(request: Request) {
         trackingId,
         eta.toISOString(),
         JSON.stringify(address),
-        JSON.stringify(lines),
+        JSON.stringify(reserved),
       ],
     );
 
@@ -211,7 +235,7 @@ export async function POST(request: Request) {
       id: orderId,
       createdAt: new Date().toISOString(),
       status: "placed",
-      items: lines,
+      items: reserved,
       address,
       paymentMethod: method === "cod" ? "cod" : "upi",
       subtotal,
@@ -240,11 +264,14 @@ export async function POST(request: Request) {
           status: paymentStatus,
           provider: payment.provider,
           redirectUrl: payment.redirectUrl,
+          paymentSessionId: payment.paymentSessionId,
+          mode: payment.mode || cashfreeMode(),
         },
       },
       { headers: { "cache-control": "private, no-store" } },
     );
   } catch (error) {
+    if (reserved.length) await restoreStock(reserved);
     console.error("place-order failed", error instanceof Error ? error.message : "unknown");
     return NextResponse.json({ error: "Could not place order." }, { status: 500 });
   }

@@ -5,6 +5,7 @@ import {
   setSessionCookie,
 } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
+import { rateLimit } from "@/lib/rateLimit";
 import { ensureSeeded } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,14 @@ export async function POST(request: Request) {
     const body = (await request.json()) as { email?: string; password?: string };
     const email = (body.email ?? "").trim().toLowerCase();
     const password = body.password ?? "";
+
+    const limited = rateLimit(`login:${email || "unknown"}`, 10, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: `Too many sign-in attempts. Try again in ${limited.retryAfterSec}s.` },
+        { status: 429 },
+      );
+    }
 
     const user = await getUserByEmail(email);
     if (!user || !(await verifyPassword(password, user.passwordHash))) {

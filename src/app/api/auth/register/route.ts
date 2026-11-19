@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
+import { rateLimit } from "@/lib/rateLimit";
 import { ensureSeeded } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,14 @@ export async function POST(request: Request) {
     const password = body.password ?? "";
     const wantSeller = body.role === "seller";
     const role: UserRole = wantSeller ? "seller" : "customer";
+
+    const limited = rateLimit(`register:${email || "unknown"}`, 5, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: `Too many registrations. Try again in ${limited.retryAfterSec}s.` },
+        { status: 429 },
+      );
+    }
 
     if (name.length < 2) {
       return NextResponse.json({ error: "Enter your full name." }, { status: 400 });
