@@ -9,7 +9,7 @@ import { useShop } from "@/context/ShopContext";
 const links = [
   { href: "/products", label: "Shop" },
   { href: "/products?category=kokum", label: "Kokum" },
-  { href: "/products?category=seafood", label: "Seafood" },
+  { href: "/products?category=cashews", label: "Cashews" },
   { href: "/products?category=spices", label: "Spices" },
   { href: "/orders", label: "Orders" },
 ];
@@ -52,7 +52,7 @@ export function Header() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search kokum, hapus, bombil…"
+            placeholder="Search kokum, cashews, hapus…"
             className="field w-full !py-2"
             aria-label="Search products"
           />

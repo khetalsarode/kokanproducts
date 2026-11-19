@@ -4,8 +4,8 @@ export type Category =
   | "kokum"
   | "mango"
   | "coconut"
+  | "cashews"
   | "spices"
-  | "seafood"
   | "sweets"
   | "rice"
   | "pickles";

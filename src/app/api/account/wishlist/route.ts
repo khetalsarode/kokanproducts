@@ -27,7 +27,10 @@ export async function PUT(request: Request) {
   }
   const body = (await request.json()) as { wishlist?: string[] };
   const wishlist = Array.isArray(body.wishlist)
-    ? [...new Set(body.wishlist.filter((id) => typeof id === "string"))]
+    ? [...new Set(body.wishlist.filter((id) => typeof id === "string"))].slice(
+        0,
+        100,
+      )
     : [];
 
   await sql(`delete from customer_wishlist where customer_id = $1`, [customer.id]);

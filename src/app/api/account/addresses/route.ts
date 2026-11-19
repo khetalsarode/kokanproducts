@@ -59,7 +59,6 @@ export async function POST(request: Request) {
   if (!body.name || !body.line1 || !body.city || !body.pincode) {
     return NextResponse.json({ error: "Address is incomplete." }, { status: 400 });
   }
-  const id = body.id || newId();
   const isDefault = Boolean(body.isDefault);
   if (isDefault) {
     await sql(
@@ -67,34 +66,54 @@ export async function POST(request: Request) {
       [customer.id],
     );
   }
-  await sql(
-    `insert into customer_addresses
-      (id, customer_id, label, name, phone, line1, line2, city, state, pincode, is_default)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-     on conflict (id) do update set
-       label = excluded.label,
-       name = excluded.name,
-       phone = excluded.phone,
-       line1 = excluded.line1,
-       line2 = excluded.line2,
-       city = excluded.city,
-       state = excluded.state,
-       pincode = excluded.pincode,
-       is_default = excluded.is_default`,
-    [
-      id,
-      customer.id,
-      body.label || "Home",
-      body.name,
-      body.phone || "—",
-      body.line1,
-      body.line2 || "",
-      body.city,
-      body.state || "Maharashtra",
-      body.pincode,
-      isDefault,
-    ],
-  );
+
+  if (body.id) {
+    const owned = await sql<{ id: string }>(
+      `select id from customer_addresses where id = $1 and customer_id = $2 limit 1`,
+      [body.id, customer.id],
+    );
+    if (!owned[0]) {
+      return NextResponse.json({ error: "Address not found." }, { status: 404 });
+    }
+    await sql(
+      `update customer_addresses set
+         label = $1, name = $2, phone = $3, line1 = $4, line2 = $5,
+         city = $6, state = $7, pincode = $8, is_default = $9
+       where id = $10 and customer_id = $11`,
+      [
+        body.label || "Home",
+        body.name,
+        body.phone || "—",
+        body.line1,
+        body.line2 || "",
+        body.city,
+        body.state || "Maharashtra",
+        body.pincode,
+        isDefault,
+        body.id,
+        customer.id,
+      ],
+    );
+  } else {
+    await sql(
+      `insert into customer_addresses
+        (id, customer_id, label, name, phone, line1, line2, city, state, pincode, is_default)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        newId(),
+        customer.id,
+        body.label || "Home",
+        body.name,
+        body.phone || "—",
+        body.line1,
+        body.line2 || "",
+        body.city,
+        body.state || "Maharashtra",
+        body.pincode,
+        isDefault,
+      ],
+    );
+  }
   return GET();
 }
 

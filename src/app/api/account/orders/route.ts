@@ -34,10 +34,18 @@ export async function POST(request: Request) {
   if (!body.order?.id) {
     return NextResponse.json({ error: "Missing order." }, { status: 400 });
   }
+  const existing = await sql<{ customer_id: string }>(
+    `select customer_id from customer_orders where id = $1 limit 1`,
+    [body.order.id],
+  );
+  if (existing[0] && existing[0].customer_id !== customer.id) {
+    return NextResponse.json({ error: "Order not found." }, { status: 404 });
+  }
   await sql(
     `insert into customer_orders (id, customer_id, payload)
      values ($1, $2, $3::jsonb)
-     on conflict (id) do update set payload = excluded.payload`,
+     on conflict (id) do update set payload = excluded.payload
+     where customer_orders.customer_id = $2`,
     [body.order.id, customer.id, JSON.stringify(body.order)],
   );
   return NextResponse.json(

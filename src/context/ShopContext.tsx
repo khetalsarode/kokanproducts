@@ -78,8 +78,8 @@ const STATUS_FLOW: OrderStatus[] = [
 ];
 
 function makeOrderId(): string {
-  const n = Math.floor(100000 + Math.random() * 900000);
-  return `KP${n}`;
+  const rand = crypto.randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase();
+  return `KP-${rand}`;
 }
 
 function makeTrackingId(): string {

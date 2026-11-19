@@ -30,7 +30,7 @@ export default function HomePage() {
             KokanProducts
           </h1>
           <p className="reveal reveal-delay-2 mt-4 max-w-md text-base text-foam/80 sm:text-lg">
-            Authentic Konkan food — kokum, hapus, bombil & coastal spices — packed at source and shipped to your kitchen.
+            Authentic Konkan food — kokum, hapus, cashews & coconut — packed at source and shipped to your kitchen.
           </p>
           <div className="reveal reveal-delay-3 mt-8 flex flex-wrap gap-3">
             <Link href="/products" className="btn-primary !bg-foam !text-sea hover:!bg-white">
@@ -84,7 +84,7 @@ export default function HomePage() {
           <p className="text-xs uppercase tracking-[0.2em] text-lagoon">Loved on the coast</p>
           <h2 className="mt-1 font-display text-3xl text-ink">Bestsellers</h2>
           <p className="mt-2 max-w-lg text-ink/60">
-            The jars and pouches Konkan kitchens reorder — solkadhi, hapus, bombil, and masalas.
+            The jars and pouches Konkan kitchens reorder — solkadhi, hapus, cashews, and masalas.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">

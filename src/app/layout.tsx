@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s · KokanProducts",
   },
   description:
-    "Authentic Konkan Food · Direct from Source · To Your Home. Specialty kokum, mango, seafood, spices & more.",
+    "Authentic Konkan Food · Direct from Source · To Your Home. Specialty kokum, mango, cashews, coconut & more.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

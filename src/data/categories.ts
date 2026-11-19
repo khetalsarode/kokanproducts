@@ -5,44 +5,44 @@ export const categoryMeta: Record<
   { label: string; blurb: string; emoji: string }
 > = {
   kokum: {
-    label: "Kokum",
-    blurb: "Tangy coastal cooler & curry staple",
-    emoji: "🟣",
+    label: "Kokum & Amsul",
+    blurb: "Solkadhi, sherbet & dried petals",
+    emoji: "◎",
   },
   mango: {
     label: "Mango",
-    blurb: "Hapus pulp, pickle & dried slices",
-    emoji: "🥭",
+    blurb: "Hapus pulp, ambapoli & dried slices",
+    emoji: "◆",
   },
   coconut: {
     label: "Coconut",
     blurb: "Oil, vinegar, chips & sugar",
-    emoji: "🥥",
+    emoji: "●",
+  },
+  cashews: {
+    label: "Cashews",
+    blurb: "Roasted nuts, brittle & butters",
+    emoji: "◇",
   },
   spices: {
     label: "Spices",
     blurb: "Malvani masalas & coastal blends",
-    emoji: "🌶️",
-  },
-  seafood: {
-    label: "Dry Seafood",
-    blurb: "Bombil, prawns & fish pickle",
-    emoji: "🐟",
+    emoji: "✦",
   },
   sweets: {
     label: "Sweets",
     blurb: "Khajur, chikki & festive treats",
-    emoji: "🍬",
+    emoji: "✧",
   },
   rice: {
     label: "Rice & Grains",
     blurb: "Ukda rice & traditional staples",
-    emoji: "🌾",
+    emoji: "☰",
   },
   pickles: {
     label: "Pickles",
     blurb: "Homestyle achar from Konkan kitchens",
-    emoji: "🫙",
+    emoji: "◈",
   },
 };
 
@@ -50,8 +50,8 @@ export const categoryOrder: Category[] = [
   "kokum",
   "mango",
   "coconut",
+  "cashews",
   "spices",
-  "seafood",
   "sweets",
   "rice",
   "pickles",
