@@ -7,12 +7,7 @@ import {
 } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
 import { rateLimit } from "@/lib/rateLimit";
-import {
-  ensureSeeded,
-  forceReseedRoleAccounts,
-  matchesSeedAdminCredentials,
-  matchesSeedSellerCredentials,
-} from "@/lib/seed";
+import { ensureSeeded } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -40,19 +35,8 @@ export async function POST(request: Request) {
       );
     }
 
-    let user = await getUserByEmail(email);
-    let passwordOk = user ? await verifyPassword(password, user.passwordHash) : false;
-
-    // Only reseed when the full demo email+password match (never on wrong password).
-    if (
-      !passwordOk &&
-      (matchesSeedAdminCredentials(email, password) ||
-        matchesSeedSellerCredentials(email, password))
-    ) {
-      await forceReseedRoleAccounts();
-      user = await getUserByEmail(email);
-      passwordOk = user ? await verifyPassword(password, user.passwordHash) : false;
-    }
+    const user = await getUserByEmail(email);
+    const passwordOk = user ? await verifyPassword(password, user.passwordHash) : false;
 
     if (!user || !passwordOk) {
       return NextResponse.json(
