@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const phone = (body.phone ?? "").trim();
     const password = body.password ?? "";
 
-    // Public registration is customer or seller only. Admins come from SEED_ADMIN_*
+    // Public registration is customer or seller only. Admins come from demo seed.
     // (or a future authenticated admin invite) — never open first-admin bootstrap.
     if (body.role === "admin") {
       return NextResponse.json(

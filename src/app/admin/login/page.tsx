@@ -3,14 +3,15 @@
 import { Suspense } from "react";
 import { RoleAuthShell } from "@/components/RoleAuthShell";
 import { RoleLoginForm } from "@/components/RoleLoginForm";
+import { DEMO_ADMIN } from "@/lib/demoCredentials";
 
 function Inner() {
   return (
     <RoleAuthShell role="admin" mode="login">
       <p className="mb-4 text-sm text-ink/55">
-        Use the exact email and password saved in Cursor Secrets as{" "}
-        <span className="font-medium text-ink">SEED_ADMIN_EMAIL</span> and{" "}
-        <span className="font-medium text-ink">SEED_ADMIN_PASSWORD</span>.
+        Demo admin:{" "}
+        <span className="font-medium text-ink">{DEMO_ADMIN.email}</span> /{" "}
+        <span className="font-medium text-ink">{DEMO_ADMIN.password}</span>
       </p>
       <RoleLoginForm role="admin" />
     </RoleAuthShell>
