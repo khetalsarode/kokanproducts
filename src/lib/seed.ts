@@ -197,7 +197,7 @@ async function ensureRoleAccounts() {
 
 /**
  * Idempotent catalog seed; role accounts sync from SEED_* secrets into Postgres
- * when the secret fingerprint changes. Login never triggers a password rewrite.
+ * when the secret fingerprint changes.
  */
 export async function ensureSeeded(): Promise<void> {
   try {
@@ -205,5 +205,51 @@ export async function ensureSeeded(): Promise<void> {
     await ensureCatalog();
   } catch (error) {
     console.error("seed failed", error instanceof Error ? error.message : "unknown");
+  }
+}
+
+/**
+ * Upsert password for a SEED_* email when the caller already proved the
+ * plaintext matches the env secret (login path). Does not run for wrong passwords.
+ */
+export async function syncSeedAccountPassword(
+  email: string,
+  password: string,
+): Promise<void> {
+  const normalized = email.trim().toLowerCase();
+  const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
+  const sellerEmail = process.env.SEED_SELLER_EMAIL?.trim().toLowerCase() ?? "";
+
+  if (
+    normalized === adminEmail &&
+    password === (process.env.SEED_ADMIN_PASSWORD ?? "")
+  ) {
+    lastRoleFingerprint = "";
+    await ensureUserFromEnv({
+      emailEnv: "SEED_ADMIN_EMAIL",
+      passwordEnv: "SEED_ADMIN_PASSWORD",
+      name: "Kokan Admin",
+      phone: "9999900001",
+      role: "admin",
+    });
+    return;
+  }
+
+  if (
+    normalized === sellerEmail &&
+    password === (process.env.SEED_SELLER_PASSWORD ?? "")
+  ) {
+    lastRoleFingerprint = "";
+    await ensureUserFromEnv({
+      emailEnv: "SEED_SELLER_EMAIL",
+      passwordEnv: "SEED_SELLER_PASSWORD",
+      name: "Konkan Seller",
+      phone: "9999900002",
+      role: "seller",
+      shop: {
+        name: process.env.SEED_SELLER_SHOP?.trim() || "Konkan Seller Shop",
+        location: process.env.SEED_SELLER_LOCATION?.trim() || "Konkan, Maharashtra",
+      },
+    });
   }
 }
