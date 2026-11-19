@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 
 let catalogDone = false;
-/** Re-run role create-if-missing when SEED_* email set changes. */
+/** Re-run when SEED_* env fingerprint changes (owner-controlled secrets). */
 let lastRoleFingerprint = "";
 let roleSeedInFlight: Promise<void> | null = null;
 
@@ -21,11 +21,13 @@ export function reservedSeedEmails(): Set<string> {
 }
 
 function roleSeedFingerprint(): string {
-  // Emails only — password changes must not rewrite existing accounts.
   return [
     process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "",
+    process.env.SEED_ADMIN_PASSWORD ?? "",
     process.env.SEED_SELLER_EMAIL?.trim().toLowerCase() ?? "",
+    process.env.SEED_SELLER_PASSWORD ?? "",
     process.env.SEED_CUSTOMER_EMAIL?.trim().toLowerCase() ?? "",
+    process.env.SEED_CUSTOMER_PASSWORD ?? "",
     process.env.SEED_SELLER_SHOP?.trim() ?? "",
     process.env.SEED_SELLER_LOCATION?.trim() ?? "",
   ].join("\0");
@@ -43,8 +45,9 @@ export function seedAdminEmail(): string {
 }
 
 /**
- * Create a role account from SEED_* when missing.
- * Never overwrites password_hash for an existing row.
+ * Upsert a role account from SEED_* into the database.
+ * Password comes only from env secrets (never hardcoded). Called from
+ * ensureSeeded when the secret fingerprint changes — not from login.
  */
 async function ensureUserFromEnv(input: {
   emailEnv: string;
@@ -62,6 +65,7 @@ async function ensureUserFromEnv(input: {
     return;
   }
 
+  const passwordHash = await hashPassword(password);
   const rows = await sql<{ id: string; role: string }>(
     `select id, role from customers where lower(email) = lower($1) limit 1`,
     [email],
@@ -70,23 +74,22 @@ async function ensureUserFromEnv(input: {
 
   if (!id) {
     id = newId();
-    const passwordHash = await hashPassword(password);
     await sql(
       `insert into customers (id, email, password_hash, name, phone, role, status)
        values ($1,$2,$3,$4,$5,$6,'active')`,
       [id, email, passwordHash, input.name, input.phone, input.role],
     );
   } else {
-    // Promote / activate only — leave password_hash untouched.
     await sql(
       `update customers
        set role = $1,
-           name = $2,
-           phone = coalesce(nullif($3, ''), phone),
+           password_hash = $2,
+           name = $3,
+           phone = coalesce(nullif($4, ''), phone),
            status = 'active',
            updated_at = now()
-       where id = $4`,
-      [input.role, input.name, input.phone, id],
+       where id = $5`,
+      [input.role, passwordHash, input.name, input.phone, id],
     );
   }
 
@@ -193,8 +196,8 @@ async function ensureRoleAccounts() {
 }
 
 /**
- * Idempotent catalog seed; role accounts are created from SEED_* only when missing.
- * Existing privileged passwords are never overwritten.
+ * Idempotent catalog seed; role accounts sync from SEED_* secrets into Postgres
+ * when the secret fingerprint changes. Login never triggers a password rewrite.
  */
 export async function ensureSeeded(): Promise<void> {
   try {
