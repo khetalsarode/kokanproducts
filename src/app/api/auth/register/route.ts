@@ -29,8 +29,8 @@ export async function POST(request: Request) {
     const email = (body.email ?? "").trim().toLowerCase();
     const phone = (body.phone ?? "").trim();
     const password = body.password ?? "";
-    const wantSeller = body.role === "seller";
-    const role: UserRole = wantSeller ? "seller" : "customer";
+    const requested =
+      body.role === "seller" ? "seller" : body.role === "admin" ? "admin" : "customer";
 
     const limited = rateLimit(`register:${email || "unknown"}`, 5, 60_000);
     if (!limited.ok) {
@@ -58,9 +58,30 @@ export async function POST(request: Request) {
         { status: 403 },
       );
     }
-    if (wantSeller && !(body.shopName ?? "").trim()) {
-      return NextResponse.json({ error: "Enter your shop name." }, { status: 400 });
+
+    let role: UserRole = "customer";
+    if (requested === "seller") {
+      role = "seller";
+      if (!(body.shopName ?? "").trim()) {
+        return NextResponse.json({ error: "Enter your shop name." }, { status: 400 });
+      }
+    } else if (requested === "admin") {
+      // Bootstrap only: allow the first admin when none exist yet.
+      const admins = await sql<{ n: string | number }>(
+        `select count(*)::int as n from customers where role = 'admin'`,
+      );
+      if (Number(admins[0]?.n ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Admin registration is closed. Ask an existing admin or use a seeded admin account.",
+          },
+          { status: 403 },
+        );
+      }
+      role = "admin";
     }
+
     if (await getUserByEmail(email)) {
       return NextResponse.json(
         { error: "An account with this email already exists." },
@@ -75,7 +96,7 @@ export async function POST(request: Request) {
        values ($1, $2, $3, $4, $5, $6, 'active')`,
       [id, email, passwordHash, name, phone, role],
     );
-    if (wantSeller) {
+    if (role === "seller") {
       await sql(
         `insert into seller_profiles (user_id, shop_name, location, bio, approved)
          values ($1, $2, $3, $4, false)`,
@@ -101,8 +122,8 @@ export async function POST(request: Request) {
           role,
           status: "active",
           createdAt: new Date().toISOString(),
-          shopName: wantSeller ? (body.shopName ?? "").trim() : undefined,
-          shopApproved: wantSeller ? false : undefined,
+          shopName: role === "seller" ? (body.shopName ?? "").trim() : undefined,
+          shopApproved: role === "seller" ? false : undefined,
         },
       },
       { headers: { "cache-control": "private, no-store" } },

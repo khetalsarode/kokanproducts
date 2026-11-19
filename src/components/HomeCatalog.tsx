@@ -47,7 +47,7 @@ export function HomeFeatured() {
           <p className="text-xs uppercase tracking-[0.2em] text-lagoon">Fresh picks</p>
           <h2 className="mt-1 font-display text-3xl text-ink">Just landed</h2>
         </div>
-        <Link href="/register" className="text-sm font-medium text-sea hover:underline">
+        <Link href="/customer/register" className="text-sm font-medium text-sea hover:underline">
           Create account →
         </Link>
       </div>

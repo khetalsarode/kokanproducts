@@ -50,7 +50,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!ready) return;
     if (!customer) {
-      router.replace("/login?next=/admin");
+      router.replace("/admin/login?next=/admin");
       return;
     }
     if (customer.role !== "admin") {

@@ -215,11 +215,11 @@ function CheckoutInner() {
       {(!customer || customer.role !== "customer") && (
         <p className="mt-4 rounded-sm border border-sea/15 bg-white/55 px-4 py-3 text-sm text-ink/70">
           Please{" "}
-          <Link href="/login?next=/checkout" className="font-medium text-sea hover:underline">
+          <Link href="/customer/login?next=/checkout" className="font-medium text-sea hover:underline">
             sign in
           </Link>{" "}
           or{" "}
-          <Link href="/register" className="font-medium text-sea hover:underline">
+          <Link href="/customer/register" className="font-medium text-sea hover:underline">
             create a customer account
           </Link>{" "}
           to place an order (required to protect stock).

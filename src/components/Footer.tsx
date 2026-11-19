@@ -50,7 +50,7 @@ export function Footer() {
             <li>FSSAI-aligned sellers</li>
             <li>Internal stock & marketplace dispatch</li>
             <li>Cash on Delivery available</li>
-            <li className="text-foam/55">Online payments via Cashfree — coming next</li>
+            <li className="text-foam/55">Online payments via Cashfree sandbox</li>
           </ul>
         </div>
       </div>

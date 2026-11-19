@@ -99,7 +99,7 @@ export function Header() {
             );
           })}
           <Link
-            href="/register"
+            href="/customer/register"
             className="ml-auto self-center text-xs font-medium text-spice hover:underline"
           >
             Create account
@@ -133,11 +133,14 @@ export function Header() {
             <Link href="/login" onClick={() => setOpen(false)} className="py-1 text-sea">
               Sign in
             </Link>
-            <Link href="/register" onClick={() => setOpen(false)} className="py-1 text-sea">
-              Create account
+            <Link href="/customer/register" onClick={() => setOpen(false)} className="py-1 text-sea">
+              Customer register
             </Link>
             <Link href="/seller/register" onClick={() => setOpen(false)} className="py-1 text-sea">
-              Sell on KokanProducts
+              Seller register
+            </Link>
+            <Link href="/admin/login" onClick={() => setOpen(false)} className="py-1 text-sea">
+              Admin sign in
             </Link>
           </div>
         </div>
