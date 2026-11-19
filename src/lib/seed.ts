@@ -1,118 +1,92 @@
 import { products } from "@/data/products";
 import { newId, type UserRole } from "@/lib/auth";
-import { DEMO_ADMIN, DEMO_SELLER } from "@/lib/demoCredentials";
 import { sql } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 
 let catalogDone = false;
-/** Re-run role seed when demo / SEED_* fingerprint changes. */
+/** Re-run role create-if-missing when SEED_* email set changes. */
 let lastRoleFingerprint = "";
 let roleSeedInFlight: Promise<void> | null = null;
 
-/** Emails reserved for provisioning — registration must not claim them. */
+/** Emails reserved for SEED_* provisioning — registration must not claim them. */
 export function reservedSeedEmails(): Set<string> {
-  return new Set([DEMO_ADMIN.email, DEMO_SELLER.email]);
+  const emails = [
+    process.env.SEED_ADMIN_EMAIL,
+    process.env.SEED_SELLER_EMAIL,
+    process.env.SEED_CUSTOMER_EMAIL,
+  ]
+    .map((v) => v?.trim().toLowerCase() ?? "")
+    .filter(Boolean);
+  return new Set(emails);
 }
 
 function roleSeedFingerprint(): string {
+  // Emails only — password changes must not rewrite existing accounts.
   return [
-    DEMO_ADMIN.email,
-    DEMO_ADMIN.password,
-    DEMO_SELLER.email,
-    DEMO_SELLER.password,
-    DEMO_SELLER.shopName,
-    DEMO_SELLER.location,
+    process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "",
+    process.env.SEED_SELLER_EMAIL?.trim().toLowerCase() ?? "",
+    process.env.SEED_CUSTOMER_EMAIL?.trim().toLowerCase() ?? "",
+    process.env.SEED_SELLER_SHOP?.trim() ?? "",
+    process.env.SEED_SELLER_LOCATION?.trim() ?? "",
   ].join("\0");
 }
 
-export function matchesSeedAdminCredentials(email: string, password: string): boolean {
-  return (
-    email.trim().toLowerCase() === DEMO_ADMIN.email &&
-    password === DEMO_ADMIN.password
-  );
-}
-
-export function matchesSeedSellerCredentials(email: string, password: string): boolean {
-  return (
-    email.trim().toLowerCase() === DEMO_SELLER.email &&
-    password === DEMO_SELLER.password
-  );
-}
-
 export function seedAdminConfigured(): boolean {
-  return DEMO_ADMIN.password.length >= 8;
+  return Boolean(
+    process.env.SEED_ADMIN_EMAIL?.trim() &&
+      (process.env.SEED_ADMIN_PASSWORD?.length ?? 0) >= 8,
+  );
 }
 
-export function demoAdminEmail(): string {
-  return DEMO_ADMIN.email;
+export function seedAdminEmail(): string {
+  return process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
 }
 
-async function upsertDemoRole(input: {
-  email: string;
-  password: string;
+/**
+ * Create a role account from SEED_* when missing.
+ * Never overwrites password_hash for an existing row.
+ */
+async function ensureUserFromEnv(input: {
+  emailEnv: string;
+  passwordEnv: string;
   name: string;
   phone: string;
-  role: Extract<UserRole, "admin" | "seller">;
+  role: UserRole;
   shop?: { name: string; location: string; bio?: string };
-  /** When true, demote every other account still holding this role. */
-  exclusiveRole?: boolean;
 }) {
-  const email = input.email.trim().toLowerCase();
-  const passwordHash = await hashPassword(input.password);
+  const email = process.env[input.emailEnv]?.trim().toLowerCase() ?? "";
+  const password = process.env[input.passwordEnv] ?? "";
+  if (!email || !password) return;
+  if (password.length < 8) {
+    console.error(`seed: ${input.passwordEnv} too short; skipped`);
+    return;
+  }
 
-  const byEmail = await sql<{ id: string; role: string }>(
+  const rows = await sql<{ id: string; role: string }>(
     `select id, role from customers where lower(email) = lower($1) limit 1`,
     [email],
   );
-  const byRole = await sql<{ id: string; email: string }>(
-    `select id, email from customers where role = $1 order by created_at asc`,
-    [input.role],
-  );
+  let id = rows[0]?.id;
 
-  let id = byEmail[0]?.id;
-
-  if (!id && byRole[0]) {
-    // Reset the oldest existing account for this role onto the new credentials.
-    id = byRole[0].id;
-    await sql(
-      `update customers
-       set email = $1,
-           password_hash = $2,
-           name = $3,
-           phone = $4,
-           role = $5,
-           status = 'active',
-           updated_at = now()
-       where id = $6`,
-      [email, passwordHash, input.name, input.phone, input.role, id],
-    );
-  } else if (!id) {
+  if (!id) {
     id = newId();
+    const passwordHash = await hashPassword(password);
     await sql(
       `insert into customers (id, email, password_hash, name, phone, role, status)
        values ($1,$2,$3,$4,$5,$6,'active')`,
       [id, email, passwordHash, input.name, input.phone, input.role],
     );
   } else {
+    // Promote / activate only — leave password_hash untouched.
     await sql(
       `update customers
        set role = $1,
-           password_hash = $2,
-           name = $3,
-           phone = coalesce(nullif($4, ''), phone),
+           name = $2,
+           phone = coalesce(nullif($3, ''), phone),
            status = 'active',
            updated_at = now()
-       where id = $5`,
-      [input.role, passwordHash, input.name, input.phone, id],
-    );
-  }
-
-  if (input.exclusiveRole) {
-    await sql(
-      `update customers
-       set role = 'customer', updated_at = now()
-       where role = $1 and id <> $2`,
-      [input.role, id],
+       where id = $4`,
+      [input.role, input.name, input.phone, id],
     );
   }
 
@@ -174,34 +148,40 @@ async function ensureCatalog() {
   catalogDone = true;
 }
 
-async function ensureRoleAccounts(force = false) {
+async function ensureRoleAccounts() {
   const fingerprint = roleSeedFingerprint();
-  if (!force && fingerprint === lastRoleFingerprint) return;
+  if (fingerprint === lastRoleFingerprint) return;
   if (roleSeedInFlight) {
     await roleSeedInFlight;
-    if (!force) return;
+    return;
   }
 
   roleSeedInFlight = (async () => {
     try {
-      await upsertDemoRole({
-        email: DEMO_ADMIN.email,
-        password: DEMO_ADMIN.password,
-        name: DEMO_ADMIN.name,
-        phone: DEMO_ADMIN.phone,
+      await ensureUserFromEnv({
+        emailEnv: "SEED_ADMIN_EMAIL",
+        passwordEnv: "SEED_ADMIN_PASSWORD",
+        name: "Kokan Admin",
+        phone: "9999900001",
         role: "admin",
-        exclusiveRole: true,
       });
-      await upsertDemoRole({
-        email: DEMO_SELLER.email,
-        password: DEMO_SELLER.password,
-        name: DEMO_SELLER.name,
-        phone: DEMO_SELLER.phone,
+      await ensureUserFromEnv({
+        emailEnv: "SEED_SELLER_EMAIL",
+        passwordEnv: "SEED_SELLER_PASSWORD",
+        name: "Konkan Seller",
+        phone: "9999900002",
         role: "seller",
         shop: {
-          name: DEMO_SELLER.shopName,
-          location: DEMO_SELLER.location,
+          name: process.env.SEED_SELLER_SHOP?.trim() || "Konkan Seller Shop",
+          location: process.env.SEED_SELLER_LOCATION?.trim() || "Konkan, Maharashtra",
         },
+      });
+      await ensureUserFromEnv({
+        emailEnv: "SEED_CUSTOMER_EMAIL",
+        passwordEnv: "SEED_CUSTOMER_PASSWORD",
+        name: "Demo Customer",
+        phone: "9999900003",
+        role: "customer",
       });
       lastRoleFingerprint = fingerprint;
     } finally {
@@ -212,14 +192,9 @@ async function ensureRoleAccounts(force = false) {
   await roleSeedInFlight;
 }
 
-/** Force recreate/update seeded role accounts from built-in demo credentials. */
-export async function forceReseedRoleAccounts(): Promise<void> {
-  lastRoleFingerprint = "";
-  await ensureRoleAccounts(true);
-}
-
 /**
- * Idempotent catalog seed; role accounts sync whenever demo credentials change.
+ * Idempotent catalog seed; role accounts are created from SEED_* only when missing.
+ * Existing privileged passwords are never overwritten.
  */
 export async function ensureSeeded(): Promise<void> {
   try {
