@@ -7,11 +7,31 @@ import {
 } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
 import { rateLimit } from "@/lib/rateLimit";
-import { ensureSeeded } from "@/lib/seed";
+import {
+  ensureSeeded,
+  seedAdminConfigured,
+  syncSeedAccountPassword,
+} from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
 const ROLES: UserRole[] = ["customer", "seller", "admin"];
+
+function matchesSeedPair(
+  email: string,
+  password: string,
+  emailEnv: string,
+  passwordEnv: string,
+): boolean {
+  const seedEmail = process.env[emailEnv]?.trim().toLowerCase() ?? "";
+  const seedPassword = process.env[passwordEnv] ?? "";
+  return (
+    seedEmail.length > 0 &&
+    seedPassword.length >= 8 &&
+    email === seedEmail &&
+    password === seedPassword
+  );
+}
 
 export async function POST(request: Request) {
   try {
@@ -35,12 +55,28 @@ export async function POST(request: Request) {
       );
     }
 
+    // If the typed pair equals owner SEED_* secrets, sync that account into
+    // the DB so hashes match after secret updates. Never runs on wrong passwords.
+    if (
+      matchesSeedPair(email, password, "SEED_ADMIN_EMAIL", "SEED_ADMIN_PASSWORD") ||
+      matchesSeedPair(email, password, "SEED_SELLER_EMAIL", "SEED_SELLER_PASSWORD")
+    ) {
+      await syncSeedAccountPassword(email, password);
+    }
+
     const user = await getUserByEmail(email);
     const passwordOk = user ? await verifyPassword(password, user.passwordHash) : false;
 
     if (!user || !passwordOk) {
+      const hint =
+        expectedRole === "admin" || expectedRole === "seller"
+          ? seedAdminConfigured() ||
+            Boolean(process.env.SEED_SELLER_EMAIL?.trim())
+            ? " Invalid email or password. Use the exact values saved in Cursor Secrets for this role."
+            : " Role secrets are not configured yet. Set SEED_ADMIN_* / SEED_SELLER_* in Cursor Secrets, then try again."
+          : "Invalid email or password.";
       return NextResponse.json(
-        { error: "Invalid email or password." },
+        { error: hint.trim() },
         { status: 401 },
       );
     }
