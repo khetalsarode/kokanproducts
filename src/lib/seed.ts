@@ -3,7 +3,10 @@ import { newId, type UserRole } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 
-let seeding: Promise<void> | null = null;
+let catalogDone = false;
+/** Re-run role seed when SEED_* env fingerprint changes (secrets appear/update). */
+let lastRoleFingerprint = "";
+let roleSeedInFlight: Promise<void> | null = null;
 
 /** Emails reserved for SEED_* provisioning — registration must not claim them. */
 export function reservedSeedEmails(): Set<string> {
@@ -15,6 +18,19 @@ export function reservedSeedEmails(): Set<string> {
     .map((v) => v?.trim().toLowerCase() ?? "")
     .filter(Boolean);
   return new Set(emails);
+}
+
+function roleSeedFingerprint(): string {
+  return [
+    process.env.SEED_ADMIN_EMAIL?.trim() ?? "",
+    process.env.SEED_ADMIN_PASSWORD ?? "",
+    process.env.SEED_SELLER_EMAIL?.trim() ?? "",
+    process.env.SEED_SELLER_PASSWORD ?? "",
+    process.env.SEED_CUSTOMER_EMAIL?.trim() ?? "",
+    process.env.SEED_CUSTOMER_PASSWORD ?? "",
+    process.env.SEED_SELLER_SHOP?.trim() ?? "",
+    process.env.SEED_SELLER_LOCATION?.trim() ?? "",
+  ].join("\0");
 }
 
 async function ensureUserFromEnv(input: {
@@ -77,11 +93,15 @@ async function ensureUserFromEnv(input: {
 }
 
 async function ensureCatalog() {
+  if (catalogDone) return;
   const count = await sql<{ n: string | number }>(
     `select count(*)::int as n from catalog_products`,
   );
   const n = Number(count[0]?.n ?? 0);
-  if (n > 0) return;
+  if (n > 0) {
+    catalogDone = true;
+    return;
+  }
   for (const p of products) {
     await sql(
       `insert into catalog_products (
@@ -114,46 +134,61 @@ async function ensureCatalog() {
       ],
     );
   }
+  catalogDone = true;
 }
 
-async function runSeed() {
+async function ensureRoleAccounts() {
+  const fingerprint = roleSeedFingerprint();
+  if (fingerprint === lastRoleFingerprint) return;
+  if (roleSeedInFlight) {
+    await roleSeedInFlight;
+    return;
+  }
+
+  roleSeedInFlight = (async () => {
+    try {
+      await ensureUserFromEnv({
+        emailEnv: "SEED_ADMIN_EMAIL",
+        passwordEnv: "SEED_ADMIN_PASSWORD",
+        name: "Kokan Admin",
+        phone: "9999900001",
+        role: "admin",
+      });
+      await ensureUserFromEnv({
+        emailEnv: "SEED_SELLER_EMAIL",
+        passwordEnv: "SEED_SELLER_PASSWORD",
+        name: "Konkan Seller",
+        phone: "9999900002",
+        role: "seller",
+        shop: {
+          name: process.env.SEED_SELLER_SHOP?.trim() || "Konkan Seller Shop",
+          location: process.env.SEED_SELLER_LOCATION?.trim() || "Konkan, Maharashtra",
+        },
+      });
+      await ensureUserFromEnv({
+        emailEnv: "SEED_CUSTOMER_EMAIL",
+        passwordEnv: "SEED_CUSTOMER_PASSWORD",
+        name: "Demo Customer",
+        phone: "9999900003",
+        role: "customer",
+      });
+      lastRoleFingerprint = fingerprint;
+    } finally {
+      roleSeedInFlight = null;
+    }
+  })();
+
+  await roleSeedInFlight;
+}
+
+/**
+ * Idempotent catalog seed; role accounts sync whenever SEED_* secrets change.
+ */
+export async function ensureSeeded(): Promise<void> {
   try {
-    // Role accounts only when the platform/operator supplies secrets — never hardcoded.
-    await ensureUserFromEnv({
-      emailEnv: "SEED_ADMIN_EMAIL",
-      passwordEnv: "SEED_ADMIN_PASSWORD",
-      name: "Kokan Admin",
-      phone: "9999900001",
-      role: "admin",
-    });
-    await ensureUserFromEnv({
-      emailEnv: "SEED_SELLER_EMAIL",
-      passwordEnv: "SEED_SELLER_PASSWORD",
-      name: "Konkan Seller",
-      phone: "9999900002",
-      role: "seller",
-      shop: {
-        name: process.env.SEED_SELLER_SHOP?.trim() || "Konkan Seller Shop",
-        location: process.env.SEED_SELLER_LOCATION?.trim() || "Konkan, Maharashtra",
-      },
-    });
-    await ensureUserFromEnv({
-      emailEnv: "SEED_CUSTOMER_EMAIL",
-      passwordEnv: "SEED_CUSTOMER_PASSWORD",
-      name: "Demo Customer",
-      phone: "9999900003",
-      role: "customer",
-    });
+    await ensureRoleAccounts();
     await ensureCatalog();
   } catch (error) {
     console.error("seed failed", error instanceof Error ? error.message : "unknown");
   }
-}
-
-/** Idempotent catalog seed; optional role accounts only via SEED_* env vars. */
-export function ensureSeeded(): Promise<void> {
-  seeding ??= runSeed().finally(() => {
-    /* keep resolved promise cached */
-  });
-  return seeding;
 }
