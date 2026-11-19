@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import { BrandLogo } from "@/components/BrandLogo";
+import { HomeSlider } from "@/components/HomeSlider";
 import { ProductCard } from "@/components/ProductCard";
 import { categoryMeta, categoryOrder } from "@/data/categories";
 import { products } from "@/data/products";
@@ -23,12 +25,13 @@ export default function HomePage() {
           />
         </div>
         <div className="relative z-10 mx-auto flex min-h-[inherit] max-w-6xl flex-col justify-end px-4 pb-16 pt-28 sm:px-6 sm:pb-20 sm:pt-32">
+          <div className="reveal mb-4">
+            <BrandLogo light size="lg" href="/" />
+          </div>
           <p className="reveal text-xs uppercase tracking-[0.28em] text-mango">
             Direct from the Konkan coast
           </p>
-          <h1 className="reveal reveal-delay-1 mt-3 max-w-3xl font-display text-5xl leading-[1.05] tracking-tight text-foam sm:text-6xl md:text-7xl">
-            KokanProducts
-          </h1>
+          <h1 className="reveal reveal-delay-1 sr-only">KokanProducts</h1>
           <p className="reveal reveal-delay-2 mt-4 max-w-md text-base text-foam/80 sm:text-lg">
             Authentic Konkan food — kokum, hapus, cashews & coconut — packed at source and shipped to your kitchen.
           </p>
@@ -42,6 +45,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <HomeSlider />
 
       <section className="section !pt-10 !pb-4">
         <div className="flex flex-wrap items-end justify-between gap-4">

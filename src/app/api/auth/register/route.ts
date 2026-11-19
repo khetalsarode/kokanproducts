@@ -1,27 +1,35 @@
 import { NextResponse } from "next/server";
 import {
   createSession,
-  getCustomerByEmail,
+  getUserByEmail,
   newId,
   setSessionCookie,
+  type UserRole,
 } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
+import { ensureSeeded } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    await ensureSeeded();
     const body = (await request.json()) as {
       name?: string;
       email?: string;
       phone?: string;
       password?: string;
+      role?: string;
+      shopName?: string;
+      location?: string;
     };
     const name = (body.name ?? "").trim();
     const email = (body.email ?? "").trim().toLowerCase();
     const phone = (body.phone ?? "").trim();
     const password = body.password ?? "";
+    const wantSeller = body.role === "seller";
+    const role: UserRole = wantSeller ? "seller" : "customer";
 
     if (name.length < 2) {
       return NextResponse.json({ error: "Enter your full name." }, { status: 400 });
@@ -35,8 +43,10 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-
-    if (await getCustomerByEmail(email)) {
+    if (wantSeller && !(body.shopName ?? "").trim()) {
+      return NextResponse.json({ error: "Enter your shop name." }, { status: 400 });
+    }
+    if (await getUserByEmail(email)) {
       return NextResponse.json(
         { error: "An account with this email already exists." },
         { status: 409 },
@@ -46,16 +56,40 @@ export async function POST(request: Request) {
     const id = newId();
     const passwordHash = await hashPassword(password);
     await sql(
-      `insert into customers (id, email, password_hash, name, phone)
-       values ($1, $2, $3, $4, $5)`,
-      [id, email, passwordHash, name, phone],
+      `insert into customers (id, email, password_hash, name, phone, role, status)
+       values ($1, $2, $3, $4, $5, $6, 'active')`,
+      [id, email, passwordHash, name, phone, role],
     );
+    if (wantSeller) {
+      await sql(
+        `insert into seller_profiles (user_id, shop_name, location, bio, approved)
+         values ($1, $2, $3, $4, true)`,
+        [
+          id,
+          (body.shopName ?? "").trim(),
+          (body.location ?? "Konkan").trim(),
+          "",
+        ],
+      );
+    }
 
     const token = await createSession(id);
     await setSessionCookie(token);
 
     return NextResponse.json(
-      { customer: { id, email, name, phone, createdAt: new Date().toISOString() } },
+      {
+        customer: {
+          id,
+          email,
+          name,
+          phone,
+          role,
+          status: "active",
+          createdAt: new Date().toISOString(),
+          shopName: wantSeller ? (body.shopName ?? "").trim() : undefined,
+          shopApproved: wantSeller ? true : undefined,
+        },
+      },
       { headers: { "cache-control": "private, no-store" } },
     );
   } catch (error) {

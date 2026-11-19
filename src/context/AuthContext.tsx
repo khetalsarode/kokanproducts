@@ -10,12 +10,18 @@ import {
   type ReactNode,
 } from "react";
 
+export type AuthRole = "customer" | "seller" | "admin";
+
 export type AuthCustomer = {
   id: string;
   email: string;
   name: string;
   phone: string;
+  role: AuthRole;
+  status: string;
   createdAt: string;
+  shopName?: string;
+  shopApproved?: boolean;
 };
 
 type AuthContextValue = {
@@ -28,6 +34,9 @@ type AuthContextValue = {
     email: string;
     phone: string;
     password: string;
+    role?: "customer" | "seller";
+    shopName?: string;
+    location?: string;
   }) => Promise<string | null>;
   logout: () => Promise<void>;
   updateProfile: (input: { name: string; phone: string }) => Promise<string | null>;
@@ -60,7 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       const data = (await res.json()) as { customer: AuthCustomer | null };
-      setCustomer(data.customer);
+      setCustomer(
+        data.customer
+          ? { ...data.customer, role: data.customer.role || "customer" }
+          : null,
+      );
     } catch {
       setCustomer(null);
     } finally {
@@ -80,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (!res.ok) return readError(res);
     const data = (await res.json()) as { customer: AuthCustomer };
-    setCustomer(data.customer);
+    setCustomer({ ...data.customer, role: data.customer.role || "customer" });
     return null;
   }, []);
 
@@ -90,6 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       phone: string;
       password: string;
+      role?: "customer" | "seller";
+      shopName?: string;
+      location?: string;
     }) => {
       const res = await fetch("/api/auth/register", {
         method: "POST",
@@ -98,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (!res.ok) return readError(res);
       const data = (await res.json()) as { customer: AuthCustomer };
-      setCustomer(data.customer);
+      setCustomer({ ...data.customer, role: data.customer.role || "customer" });
       return null;
     },
     [],
@@ -118,7 +134,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (!res.ok) return readError(res);
       const data = (await res.json()) as { customer: AuthCustomer };
-      setCustomer(data.customer);
+      setCustomer((prev) =>
+        prev
+          ? { ...prev, ...data.customer, role: data.customer.role || prev.role }
+          : { ...data.customer, role: data.customer.role || "customer" },
+      );
       return null;
     },
     [],
@@ -167,4 +187,10 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
+}
+
+export function dashboardPathForRole(role: AuthRole | undefined): string {
+  if (role === "admin") return "/admin";
+  if (role === "seller") return "/seller";
+  return "/account";
 }

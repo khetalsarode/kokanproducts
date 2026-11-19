@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BrandLogo } from "@/components/BrandLogo";
 import { useAuth } from "@/context/AuthContext";
 
 export default function RegisterPage() {
@@ -46,7 +47,8 @@ export default function RegisterPage() {
 
   return (
     <div className="section !pt-10 max-w-lg">
-      <p className="text-xs uppercase tracking-[0.2em] text-lagoon">Join KokanProducts</p>
+      <BrandLogo href="/" />
+      <p className="mt-6 text-xs uppercase tracking-[0.2em] text-lagoon">Join KokanProducts</p>
       <h1 className="mt-2 font-display text-4xl text-ink">Create account</h1>
       <p className="mt-2 text-ink/60">
         Save addresses, track orders, and keep your wishlist across devices.

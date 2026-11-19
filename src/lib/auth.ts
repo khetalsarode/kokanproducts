@@ -1,36 +1,54 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { sql } from "./db";
 
 export const SESSION_COOKIE = "kp_session";
 const SESSION_DAYS = 30;
 
-export type Customer = {
+export type UserRole = "customer" | "seller" | "admin";
+
+export type AuthUser = {
   id: string;
   email: string;
   name: string;
   phone: string;
+  role: UserRole;
+  status: string;
   createdAt: string;
+  shopName?: string;
+  shopApproved?: boolean;
 };
 
-type CustomerRow = {
+/** @deprecated use AuthUser — kept for gradual rename */
+export type Customer = AuthUser;
+
+type UserRow = {
   id: string;
   email: string;
   name: string;
   phone: string;
+  role: string;
+  status: string;
   created_at: Date | string;
+  shop_name?: string | null;
+  approved?: boolean | null;
 };
 
-function mapCustomer(row: CustomerRow): Customer {
+function mapUser(row: UserRow): AuthUser {
   return {
     id: row.id,
     email: row.email,
     name: row.name,
     phone: row.phone,
+    role: (row.role as UserRole) || "customer",
+    status: row.status || "active",
     createdAt:
       typeof row.created_at === "string"
         ? row.created_at
         : row.created_at.toISOString(),
+    shopName: row.shop_name ?? undefined,
+    shopApproved: row.approved ?? undefined,
   };
 }
 
@@ -46,14 +64,14 @@ export function newSessionToken(): string {
   return randomBytes(32).toString("hex");
 }
 
-export async function createSession(customerId: string): Promise<string> {
+export async function createSession(userId: string): Promise<string> {
   const token = newSessionToken();
   const expires = new Date();
   expires.setDate(expires.getDate() + SESSION_DAYS);
   await sql(
     `insert into sessions (id, customer_id, token_hash, expires_at)
      values ($1, $2, $3, $4)`,
-    [newId(), customerId, hashToken(token), expires.toISOString()],
+    [newId(), userId, hashToken(token), expires.toISOString()],
   );
   return token;
 }
@@ -63,45 +81,83 @@ export async function destroySession(token: string | undefined): Promise<void> {
   await sql(`delete from sessions where token_hash = $1`, [hashToken(token)]);
 }
 
-export async function getCustomerByEmail(
+const USER_SELECT = `
+  c.id, c.email, c.name, c.phone, c.role, c.status, c.created_at,
+  sp.shop_name, sp.approved
+`;
+
+export async function getUserByEmail(
   email: string,
-): Promise<(Customer & { passwordHash: string }) | null> {
-  const rows = await sql<CustomerRow & { password_hash: string }>(
-    `select id, email, name, phone, created_at, password_hash
-     from customers where lower(email) = lower($1) limit 1`,
+): Promise<(AuthUser & { passwordHash: string }) | null> {
+  const rows = await sql<UserRow & { password_hash: string }>(
+    `select ${USER_SELECT}, c.password_hash
+     from customers c
+     left join seller_profiles sp on sp.user_id = c.id
+     where lower(c.email) = lower($1) limit 1`,
     [email.trim()],
   );
   const row = rows[0];
   if (!row) return null;
-  return { ...mapCustomer(row), passwordHash: row.password_hash };
+  return { ...mapUser(row), passwordHash: row.password_hash };
 }
 
-export async function getCustomerById(id: string): Promise<Customer | null> {
-  const rows = await sql<CustomerRow>(
-    `select id, email, name, phone, created_at from customers where id = $1`,
+/** @deprecated */
+export const getCustomerByEmail = getUserByEmail;
+
+export async function getUserById(id: string): Promise<AuthUser | null> {
+  const rows = await sql<UserRow>(
+    `select ${USER_SELECT}
+     from customers c
+     left join seller_profiles sp on sp.user_id = c.id
+     where c.id = $1`,
     [id],
   );
-  return rows[0] ? mapCustomer(rows[0]) : null;
+  return rows[0] ? mapUser(rows[0]) : null;
 }
 
-export async function getSessionCustomer(
+/** @deprecated */
+export const getCustomerById = getUserById;
+
+export async function getSessionUser(
   token: string | undefined,
-): Promise<Customer | null> {
+): Promise<AuthUser | null> {
   if (!token) return null;
-  const rows = await sql<CustomerRow>(
-    `select c.id, c.email, c.name, c.phone, c.created_at
+  const rows = await sql<UserRow>(
+    `select ${USER_SELECT}
      from sessions s
      join customers c on c.id = s.customer_id
+     left join seller_profiles sp on sp.user_id = c.id
      where s.token_hash = $1 and s.expires_at > now()
      limit 1`,
     [hashToken(token)],
   );
-  return rows[0] ? mapCustomer(rows[0]) : null;
+  return rows[0] ? mapUser(rows[0]) : null;
 }
 
-export async function getRequestCustomer(): Promise<Customer | null> {
+export async function getRequestUser(): Promise<AuthUser | null> {
   const jar = await cookies();
-  return getSessionCustomer(jar.get(SESSION_COOKIE)?.value);
+  return getSessionUser(jar.get(SESSION_COOKIE)?.value);
+}
+
+/** @deprecated */
+export const getRequestCustomer = getRequestUser;
+/** @deprecated */
+export const getSessionCustomer = getSessionUser;
+
+export async function requireUser(
+  roles?: UserRole[],
+): Promise<AuthUser | NextResponse> {
+  const user = await getRequestUser();
+  if (!user || user.status !== "active") {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+  if (roles && !roles.includes(user.role)) {
+    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  }
+  if (user.role === "seller" && user.shopApproved === false && roles?.includes("seller")) {
+    // sellers can still log in to dashboard; product mutations check approval separately
+  }
+  return user;
 }
 
 export async function setSessionCookie(token: string): Promise<void> {

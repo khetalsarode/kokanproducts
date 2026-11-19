@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { BrandLogo } from "@/components/BrandLogo";
+import { dashboardPathForRole, useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
 
 const links = [
@@ -23,6 +24,7 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const showCartCount = ready && cartCount > 0;
   const showWishCount = ready && wishlist.length > 0;
+  const dash = dashboardPathForRole(customer?.role);
 
   function onSearch(e: FormEvent) {
     e.preventDefault();
@@ -42,12 +44,7 @@ export function Header() {
         >
           ☰
         </button>
-        <Link href="/" className="group flex items-center gap-2">
-          <span className="logo-mark" aria-hidden />
-          <span className="font-display text-xl tracking-tight text-sea sm:text-2xl">
-            KokanProducts
-          </span>
-        </Link>
+        <BrandLogo />
         <form onSubmit={onSearch} className="ml-auto hidden flex-1 max-w-md md:flex">
           <input
             value={q}
@@ -63,8 +60,12 @@ export function Header() {
             {showWishCount && <em>{wishlist.length}</em>}
           </Link>
           {authReady && customer ? (
-            <Link href="/account" className="hidden text-ink/70 hover:text-sea sm:inline">
-              {customer.name.split(" ")[0]}
+            <Link href={dash} className="hidden text-ink/70 hover:text-sea sm:inline">
+              {customer.role === "admin"
+                ? "Admin"
+                : customer.role === "seller"
+                  ? "Seller"
+                  : customer.name.split(" ")[0]}
             </Link>
           ) : (
             <Link href="/login" className="hidden text-ink/70 hover:text-sea sm:inline">
@@ -126,7 +127,7 @@ export function Header() {
                 {l.label}
               </Link>
             ))}
-            <Link href="/account" onClick={() => setOpen(false)} className="py-1 text-sea">
+            <Link href={dash} onClick={() => setOpen(false)} className="py-1 text-sea">
               Account
             </Link>
             <Link href="/login" onClick={() => setOpen(false)} className="py-1 text-sea">
@@ -135,8 +136,8 @@ export function Header() {
             <Link href="/register" onClick={() => setOpen(false)} className="py-1 text-sea">
               Create account
             </Link>
-            <Link href="/returns" onClick={() => setOpen(false)} className="py-1 text-sea">
-              Returns
+            <Link href="/seller/register" onClick={() => setOpen(false)} className="py-1 text-sea">
+              Sell on KokanProducts
             </Link>
           </div>
         </div>

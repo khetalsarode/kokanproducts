@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && node scripts/migrate.mjs",
+    "build": "next build && node scripts/migrate.mjs && node scripts/seed-roles.mjs",
     "start": "next start",
     "lint": "eslint"
   },

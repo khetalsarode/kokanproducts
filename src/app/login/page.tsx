@@ -1,23 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { BrandLogo } from "@/components/BrandLogo";
+import { dashboardPathForRole, useAuth } from "@/context/AuthContext";
 
 function LoginForm() {
   const { login, customer, ready } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/account";
+  const next = params.get("next");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (ready && customer) {
-    router.replace(next);
+    router.replace(next || dashboardPathForRole(customer.role));
   }
 
   async function onSubmit(e: FormEvent) {
@@ -30,15 +30,15 @@ function LoginForm() {
       setError(err);
       return;
     }
-    router.push(next);
   }
 
   return (
     <div className="section !pt-10 max-w-lg">
-      <p className="text-xs uppercase tracking-[0.2em] text-lagoon">Welcome back</p>
+      <BrandLogo href="/" />
+      <p className="mt-6 text-xs uppercase tracking-[0.2em] text-lagoon">Welcome back</p>
       <h1 className="mt-2 font-display text-4xl text-ink">Sign in</h1>
       <p className="mt-2 text-ink/60">
-        Access your orders, wishlist, and saved addresses.
+        Customers, sellers, and admins use the same sign-in — you’ll land on the right dashboard.
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 grid gap-3">
@@ -72,9 +72,15 @@ function LoginForm() {
       </form>
 
       <p className="mt-6 text-sm text-ink/60">
-        New to KokanProducts?{" "}
+        New customer?{" "}
         <Link href="/register" className="font-medium text-sea hover:underline">
           Create an account
+        </Link>
+      </p>
+      <p className="mt-2 text-sm text-ink/60">
+        Want to sell?{" "}
+        <Link href="/seller/register" className="font-medium text-sea hover:underline">
+          Seller registration
         </Link>
       </p>
     </div>
