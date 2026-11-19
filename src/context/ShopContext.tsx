@@ -12,9 +12,9 @@ import {
 } from "react";
 import { applyCoupon } from "@/data/coupons";
 import { defaultAddresses } from "@/data/addresses";
-import { getProduct, products } from "@/data/products";
 import { getSeller } from "@/data/sellers";
 import { useAuth } from "@/context/AuthContext";
+import { useCatalog } from "@/context/CatalogContext";
 import type {
   Address,
   CartItem,
@@ -88,6 +88,7 @@ function makeTrackingId(): string {
 
 export function ShopProvider({ children }: { children: ReactNode }) {
   const { ready: authReady, customer } = useAuth();
+  const { ready: catalogReady, getProduct } = useCatalog();
   const [ready, setReady] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
@@ -240,40 +241,46 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       const p = getProduct(item.productId);
       return sum + (p ? p.price * item.qty : 0);
     }, 0);
-  }, [cart]);
+  }, [cart, getProduct]);
 
-  const addToCart = useCallback((productId: string, qty = 1) => {
-    const product = getProduct(productId);
-    if (!product || product.stock <= 0) return;
-    setCart((prev) => {
-      const existing = prev.find((i) => i.productId === productId);
-      if (existing) {
-        return prev.map((i) =>
-          i.productId === productId
-            ? { ...i, qty: Math.min(i.qty + qty, product.stock) }
-            : i,
-        );
+  const addToCart = useCallback(
+    (productId: string, qty = 1) => {
+      const product = getProduct(productId);
+      if (!product || product.stock <= 0) return;
+      setCart((prev) => {
+        const existing = prev.find((i) => i.productId === productId);
+        if (existing) {
+          return prev.map((i) =>
+            i.productId === productId
+              ? { ...i, qty: Math.min(i.qty + qty, product.stock) }
+              : i,
+          );
+        }
+        return [...prev, { productId, qty: Math.min(qty, product.stock) }];
+      });
+      setFlash(`Added ${product.shortName} to cart`);
+    },
+    [getProduct],
+  );
+
+  const setQty = useCallback(
+    (productId: string, qty: number) => {
+      const product = getProduct(productId);
+      if (!product) return;
+      if (qty <= 0) {
+        setCart((prev) => prev.filter((i) => i.productId !== productId));
+        return;
       }
-      return [...prev, { productId, qty: Math.min(qty, product.stock) }];
-    });
-    setFlash(`Added ${product.shortName} to cart`);
-  }, []);
-
-  const setQty = useCallback((productId: string, qty: number) => {
-    const product = getProduct(productId);
-    if (!product) return;
-    if (qty <= 0) {
-      setCart((prev) => prev.filter((i) => i.productId !== productId));
-      return;
-    }
-    setCart((prev) =>
-      prev.map((i) =>
-        i.productId === productId
-          ? { ...i, qty: Math.min(qty, product.stock) }
-          : i,
-      ),
-    );
-  }, []);
+      setCart((prev) =>
+        prev.map((i) =>
+          i.productId === productId
+            ? { ...i, qty: Math.min(qty, product.stock) }
+            : i,
+        ),
+      );
+    },
+    [getProduct],
+  );
 
   const removeFromCart = useCallback((productId: string) => {
     setCart((prev) => prev.filter((i) => i.productId !== productId));
@@ -326,7 +333,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
             qty: item.qty,
             price: p.price,
             fulfillment: p.fulfillment,
-            sellerName: getSeller(p.sellerId).name,
+            sellerName: getSeller(p.sellerId)?.name || p.sellerId,
           };
         })
         .filter(Boolean) as Order["items"];
@@ -357,7 +364,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       setFlash(`Order ${order.id} placed`);
       return order;
     },
-    [addresses, cart, cartSubtotal],
+    [addresses, cart, cartSubtotal, getProduct],
   );
 
   const getOrder = useCallback(
@@ -413,7 +420,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   );
 
   const value: ShopContextValue = {
-    ready: ready && authReady,
+    ready: ready && authReady && catalogReady,
     cart,
     wishlist,
     orders,
@@ -442,8 +449,4 @@ export function useShop(): ShopContextValue {
   const ctx = useContext(ShopContext);
   if (!ctx) throw new Error("useShop must be used within ShopProvider");
   return ctx;
-}
-
-export function useCatalog() {
-  return products;
 }

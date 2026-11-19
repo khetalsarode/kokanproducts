@@ -1,4 +1,3 @@
-import { products as seedProducts } from "@/data/products";
 import { sql } from "@/lib/db";
 import { ensureSeeded } from "@/lib/seed";
 import type { Category, Fulfillment, Product } from "@/types";
@@ -71,7 +70,7 @@ export async function listCatalogProducts(opts?: {
     `select * from catalog_products ${clause} order by name asc`,
     params,
   );
-  if (rows.length === 0) return seedProducts;
+  // Database is the source of truth after seed. Do not fall back to hardcoded catalog.
   return rows.map(mapCatalogRow);
 }
 
@@ -80,9 +79,8 @@ export async function getCatalogProduct(
 ): Promise<Product | undefined> {
   await ensureSeeded();
   const rows = await sql<CatalogRow>(
-    `select * from catalog_products where id = $1 or slug = $1 limit 1`,
+    `select * from catalog_products where (id = $1 or slug = $1) and active = true limit 1`,
     [idOrSlug],
   );
-  if (rows[0]) return mapCatalogRow(rows[0]);
-  return seedProducts.find((p) => p.id === idOrSlug || p.slug === idOrSlug);
+  return rows[0] ? mapCatalogRow(rows[0]) : undefined;
 }
