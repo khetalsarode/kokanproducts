@@ -8,9 +8,7 @@ function Inner() {
   return (
     <RoleAuthShell role="admin" mode="login">
       <p className="mb-4 text-sm text-ink/55">
-        Sign in with the admin email and password from your Cursor Secrets (
-        <span className="font-medium text-ink">SEED_ADMIN_EMAIL</span> /{" "}
-        <span className="font-medium text-ink">SEED_ADMIN_PASSWORD</span>).
+        Use the exact admin email and password saved in Cursor Secrets.
       </p>
       <RoleLoginForm role="admin" />
     </RoleAuthShell>
