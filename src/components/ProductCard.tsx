@@ -5,12 +5,15 @@ import type { Product } from "@/types";
 import { formatINR, discountPercent } from "@/lib/format";
 import { ProductArt } from "./ProductArt";
 import { Stars } from "./Stars";
+import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
 
 export function ProductCard({ product }: { product: Product }) {
+  const { customer } = useAuth();
   const { addToCart, toggleWishlist, isWishlisted } = useShop();
   const off = discountPercent(product.price, product.mrp);
   const wish = isWishlisted(product.id);
+  const isStaff = customer?.role === "admin" || customer?.role === "seller";
 
   return (
     <article className="group relative flex flex-col">
@@ -29,14 +32,16 @@ export function ProductCard({ product }: { product: Product }) {
           )}
         </div>
       </Link>
-      <button
-        type="button"
-        onClick={() => toggleWishlist(product.id)}
-        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-sm text-sea shadow-sm backdrop-blur transition hover:bg-white"
-        aria-label={wish ? "Remove from wishlist" : "Add to wishlist"}
-      >
-        {wish ? "♥" : "♡"}
-      </button>
+      {!isStaff && (
+        <button
+          type="button"
+          onClick={() => toggleWishlist(product.id)}
+          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-sm text-sea shadow-sm backdrop-blur transition hover:bg-white"
+          aria-label={wish ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          {wish ? "♥" : "♡"}
+        </button>
+      )}
       <div className="mt-3 flex flex-1 flex-col gap-1">
         <p className="text-[10px] uppercase tracking-[0.18em] text-lagoon">
           {product.category}
@@ -55,19 +60,21 @@ export function ProductCard({ product }: { product: Product }) {
               <p className="text-xs text-ink/40 line-through">{formatINR(product.mrp)}</p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              addToCart(product.id);
-            }}
-            disabled={product.stock <= 0}
-            data-testid={`add-${product.id}`}
-            className="btn-primary relative z-10 !px-3 !py-2 text-xs disabled:opacity-40"
-          >
-            {product.stock <= 0 ? "Sold out" : "Add"}
-          </button>
+          {!isStaff && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                addToCart(product.id);
+              }}
+              disabled={product.stock <= 0}
+              data-testid={`add-${product.id}`}
+              className="btn-primary relative z-10 !px-3 !py-2 text-xs disabled:opacity-40"
+            >
+              {product.stock <= 0 ? "Sold out" : "Add"}
+            </button>
+          )}
         </div>
       </div>
     </article>
