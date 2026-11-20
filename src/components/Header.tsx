@@ -22,8 +22,14 @@ export function Header() {
   const { cartCount, wishlist, ready } = useShop();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-  const showCartCount = ready && cartCount > 0;
-  const showWishCount = ready && wishlist.length > 0;
+  const isStaff =
+    customer?.role === "admin" ||
+    customer?.role === "seller" ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/seller");
+  const showShopActions = !isStaff;
+  const showCartCount = showShopActions && ready && cartCount > 0;
+  const showWishCount = showShopActions && ready && wishlist.length > 0;
   const dash = dashboardPathForRole(customer?.role);
 
   function onSearch(e: FormEvent) {
@@ -55,10 +61,12 @@ export function Header() {
           />
         </form>
         <nav className="ml-auto flex items-center gap-3 text-sm sm:ml-0">
-          <Link href="/wishlist" className="nav-icon" aria-label="Wishlist">
-            ♡<span className="sr-only">Wishlist</span>
-            {showWishCount && <em>{wishlist.length}</em>}
-          </Link>
+          {showShopActions && (
+            <Link href="/wishlist" className="nav-icon" aria-label="Wishlist">
+              ♡<span className="sr-only">Wishlist</span>
+              {showWishCount && <em>{wishlist.length}</em>}
+            </Link>
+          )}
           {authReady && customer ? (
             <Link href={dash} className="hidden text-ink/70 hover:text-sea sm:inline">
               {customer.role === "admin"
@@ -72,10 +80,12 @@ export function Header() {
               Sign in
             </Link>
           )}
-          <Link href="/cart" className="nav-icon" aria-label="Cart">
-            Bag
-            {showCartCount && <em>{cartCount}</em>}
-          </Link>
+          {showShopActions && (
+            <Link href="/cart" className="nav-icon" aria-label="Cart">
+              Bag
+              {showCartCount && <em>{cartCount}</em>}
+            </Link>
+          )}
         </nav>
       </div>
       <div className="hidden border-t border-sea/5 sm:block">

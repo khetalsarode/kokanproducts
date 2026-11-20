@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ProductArt } from "@/components/ProductArt";
 import { ProductCard } from "@/components/ProductCard";
 import { Stars } from "@/components/Stars";
+import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
 import { getSeller } from "@/data/sellers";
 import { formatINR, discountPercent, formatDate } from "@/lib/format";
@@ -17,6 +18,7 @@ export function ProductDetail({
   product: Product;
   related: Product[];
 }) {
+  const { customer } = useAuth();
   const { addToCart, toggleWishlist, isWishlisted } = useShop();
   const [qty, setQty] = useState(1);
   const [imageIndex, setImageIndex] = useState(0);
@@ -24,6 +26,7 @@ export function ProductDetail({
   const seller = getSeller(product.sellerId);
   const off = discountPercent(product.price, product.mrp);
   const wish = isWishlisted(product.id);
+  const isStaff = customer?.role === "admin" || customer?.role === "seller";
 
   function handleAdd() {
     if (product.stock <= 0 || justAdded) return;
@@ -129,39 +132,50 @@ export function ProductDetail({
             </p>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <div className="flex items-center rounded-full border border-sea/20 bg-white/70">
+          {isStaff ? (
+            <p className="mt-6 rounded-xl border border-sea/10 bg-foam/80 px-4 py-3 text-sm text-ink/60">
+              Shopping bag and wishlist are for customers only. Use your{" "}
+              {customer?.role === "admin" ? "admin" : "seller"} dashboard to manage the catalogue.
+            </p>
+          ) : (
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <div className="flex items-center rounded-full border border-sea/20 bg-white/70">
+                <button
+                  type="button"
+                  className="px-3 py-2 text-sea"
+                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  aria-label="Decrease quantity"
+                >
+                  −
+                </button>
+                <span className="min-w-8 text-center font-medium">{qty}</span>
+                <button
+                  type="button"
+                  className="px-3 py-2 text-sea"
+                  onClick={() => setQty((q) => Math.min(product.stock, q + 1))}
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
               <button
                 type="button"
-                className="px-3 py-2 text-sea"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-                aria-label="Decrease quantity"
+                className="btn-primary min-w-[9rem]"
+                disabled={product.stock <= 0}
+                data-testid="add-to-bag"
+                onClick={handleAdd}
               >
-                −
+                {justAdded ? "Added ✓" : "Add to bag"}
               </button>
-              <span className="min-w-8 text-center font-medium">{qty}</span>
               <button
                 type="button"
-                className="px-3 py-2 text-sea"
-                onClick={() => setQty((q) => Math.min(product.stock, q + 1))}
-                aria-label="Increase quantity"
+                className="btn-outline"
+                onClick={() => toggleWishlist(product.id)}
               >
-                +
+                {wish ? "♥ Saved" : "♡ Wishlist"}
               </button>
             </div>
-            <button
-              type="button"
-              className="btn-primary min-w-[9rem]"
-              disabled={product.stock <= 0}
-              data-testid="add-to-bag"
-              onClick={handleAdd}
-            >
-              {justAdded ? "Added ✓" : "Add to bag"}
-            </button>
-            <button type="button" className="btn-outline" onClick={() => toggleWishlist(product.id)}>
-              {wish ? "♥ Saved" : "♡ Wishlist"}
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
