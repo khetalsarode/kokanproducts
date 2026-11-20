@@ -108,12 +108,14 @@ export function Header() {
               </Link>
             );
           })}
-          <Link
-            href="/customer/register"
-            className="ml-auto self-center text-xs font-medium text-spice hover:underline"
-          >
-            Create account
-          </Link>
+          {!customer && (
+            <Link
+              href="/customer/register"
+              className="ml-auto self-center text-xs font-medium text-spice hover:underline"
+            >
+              Create account
+            </Link>
+          )}
         </nav>
       </div>
       {open && (
@@ -137,21 +139,38 @@ export function Header() {
                 {l.label}
               </Link>
             ))}
-            <Link href={dash} onClick={() => setOpen(false)} className="py-1 text-sea">
-              Account
-            </Link>
-            <Link href="/login" onClick={() => setOpen(false)} className="py-1 text-sea">
-              Sign in
-            </Link>
-            <Link href="/customer/register" onClick={() => setOpen(false)} className="py-1 text-sea">
-              Customer register
-            </Link>
-            <Link href="/seller/register" onClick={() => setOpen(false)} className="py-1 text-sea">
-              Seller register
-            </Link>
-            <Link href="/admin/login" onClick={() => setOpen(false)} className="py-1 text-sea">
-              Admin sign in
-            </Link>
+            {customer ? (
+              <Link href={dash} onClick={() => setOpen(false)} className="py-1 text-sea">
+                {customer.role === "admin"
+                  ? "Admin"
+                  : customer.role === "seller"
+                    ? "Seller desk"
+                    : "Account"}
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" onClick={() => setOpen(false)} className="py-1 text-sea">
+                  Sign in
+                </Link>
+                <Link
+                  href="/customer/register"
+                  onClick={() => setOpen(false)}
+                  className="py-1 text-sea"
+                >
+                  Create account
+                </Link>
+                <Link
+                  href="/seller/register"
+                  onClick={() => setOpen(false)}
+                  className="py-1 text-sea"
+                >
+                  Seller register
+                </Link>
+                <Link href="/admin/login" onClick={() => setOpen(false)} className="py-1 text-sea">
+                  Admin sign in
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}
