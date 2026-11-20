@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ProductCard } from "@/components/ProductCard";
+import { useAuth } from "@/context/AuthContext";
 import { useCatalog } from "@/context/CatalogContext";
 
 export function HomeBestsellers() {
@@ -31,6 +32,7 @@ export function HomeBestsellers() {
 }
 
 export function HomeFeatured() {
+  const { customer } = useAuth();
   const { products, ready } = useCatalog();
   const featured = products.slice(0, 4);
 
@@ -47,9 +49,11 @@ export function HomeFeatured() {
           <p className="text-xs uppercase tracking-[0.2em] text-lagoon">Fresh picks</p>
           <h2 className="mt-1 font-display text-3xl text-ink">Just landed</h2>
         </div>
-        <Link href="/customer/register" className="text-sm font-medium text-sea hover:underline">
-          Create account →
-        </Link>
+        {!customer && (
+          <Link href="/customer/register" className="text-sm font-medium text-sea hover:underline">
+            Create account →
+          </Link>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
         {featured.map((p) => (
