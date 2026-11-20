@@ -95,12 +95,13 @@ async function ensureUserFromEnv(input: {
 
   if (input.shop) {
     await sql(
-      `insert into seller_profiles (user_id, shop_name, location, bio, approved)
-       values ($1,$2,$3,$4,true)
+      `insert into seller_profiles (user_id, shop_name, location, bio, approved, registration_status)
+       values ($1,$2,$3,$4,true,'approved')
        on conflict (user_id) do update set
          shop_name = excluded.shop_name,
          location = excluded.location,
-         approved = true`,
+         approved = true,
+         registration_status = 'approved'`,
       [id, input.shop.name, input.shop.location, input.shop.bio || ""],
     );
   }

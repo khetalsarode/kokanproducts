@@ -362,3 +362,107 @@ body {
     animation: none !important;
   }
 }
+
+/* —— Admin / Seller dashboards —— */
+.dash-root {
+  background:
+    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(26, 122, 114, 0.12), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(232, 163, 23, 0.1), transparent 50%),
+    linear-gradient(180deg, #f4faf8 0%, #eef6f3 45%, #f7f1e8 100%);
+}
+
+.dash-card {
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--sea) 10%, transparent);
+  background: color-mix(in srgb, white 82%, transparent);
+  padding: 1.1rem 1.2rem;
+  box-shadow: 0 10px 30px -18px rgba(20, 37, 35, 0.35);
+}
+
+.dash-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ink) 70%, transparent);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dash-nav-item:hover {
+  background: color-mix(in srgb, var(--mist) 70%, white);
+  color: var(--ink);
+}
+
+.dash-nav-item.is-active {
+  background: var(--sea);
+  color: var(--foam);
+  box-shadow: 0 8px 20px -12px rgba(12, 74, 70, 0.55);
+}
+
+.dash-badge {
+  min-width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--spice);
+  color: white;
+}
+
+.dash-nav-item.is-active .dash-badge {
+  background: var(--mango);
+  color: var(--ink);
+}
+
+.dash-table-wrap {
+  overflow: auto;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--sea) 10%, transparent);
+  background: white;
+}
+
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.dash-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 45%, transparent);
+  background: #f7fbf9;
+  border-bottom: 1px solid color-mix(in srgb, var(--sea) 8%, transparent);
+}
+
+.dash-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--sea) 6%, transparent);
+  vertical-align: top;
+}
+
+.dash-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.dash-empty {
+  border-radius: 1rem;
+  border: 1px dashed color-mix(in srgb, var(--sea) 20%, transparent);
+  background: white/50;
+  padding: 2rem;
+  text-align: center;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+}

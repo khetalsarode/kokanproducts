@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { ensureSeeded, seedAdminConfigured } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Public, non-sensitive health: whether SEED_* role secrets are present and
- * whether matching customer rows exist. Never returns emails or passwords.
+ * Admin-only health: whether SEED_* role secrets are present and whether
+ * matching customer rows exist. Never returns emails or passwords.
  */
 export async function GET() {
   await ensureSeeded();
+  const user = await requireUser(["admin"]);
+  if (user instanceof NextResponse) return user;
 
   const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
   const sellerEmail = process.env.SEED_SELLER_EMAIL?.trim().toLowerCase() ?? "";

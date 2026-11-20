@@ -22,6 +22,8 @@ export type AuthCustomer = {
   createdAt: string;
   shopName?: string;
   shopApproved?: boolean;
+  registrationStatus?: "pending" | "approved" | "rejected";
+  rejectionReason?: string;
 };
 
 type AuthContextValue = {

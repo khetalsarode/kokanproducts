@@ -18,6 +18,8 @@ export type AuthUser = {
   createdAt: string;
   shopName?: string;
   shopApproved?: boolean;
+  registrationStatus?: "pending" | "approved" | "rejected";
+  rejectionReason?: string;
 };
 
 /** @deprecated use AuthUser — kept for gradual rename */
@@ -33,9 +35,19 @@ type UserRow = {
   created_at: Date | string;
   shop_name?: string | null;
   approved?: boolean | null;
+  registration_status?: string | null;
+  rejection_reason?: string | null;
 };
 
 function mapUser(row: UserRow): AuthUser {
+  const registrationStatus = (row.registration_status ||
+    (row.approved ? "approved" : undefined)) as
+    | "pending"
+    | "approved"
+    | "rejected"
+    | undefined;
+  const shopApproved =
+    registrationStatus === "approved" || row.approved === true;
   return {
     id: row.id,
     email: row.email,
@@ -48,7 +60,9 @@ function mapUser(row: UserRow): AuthUser {
         ? row.created_at
         : row.created_at.toISOString(),
     shopName: row.shop_name ?? undefined,
-    shopApproved: row.approved ?? undefined,
+    shopApproved,
+    registrationStatus,
+    rejectionReason: row.rejection_reason || undefined,
   };
 }
 
@@ -83,7 +97,7 @@ export async function destroySession(token: string | undefined): Promise<void> {
 
 const USER_SELECT = `
   c.id, c.email, c.name, c.phone, c.role, c.status, c.created_at,
-  sp.shop_name, sp.approved
+  sp.shop_name, sp.approved, sp.registration_status, sp.rejection_reason
 `;
 
 export async function getUserByEmail(
