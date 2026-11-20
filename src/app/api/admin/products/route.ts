@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { newId, requireUser } from "@/lib/auth";
+import { createProductRequest, type ProductProposal } from "@/lib/approvals";
 import { listCatalogProducts, mapCatalogRow } from "@/lib/catalog";
 import { sql } from "@/lib/db";
 import { ensureSeeded } from "@/lib/seed";
@@ -20,6 +21,28 @@ export async function GET() {
   );
 }
 
+function proposalFromBody(body: Record<string, unknown>, id?: string): ProductProposal {
+  const name = String(body.name || "").trim();
+  return {
+    id,
+    slug: String(body.slug || ""),
+    name,
+    shortName: String(body.shortName || name),
+    category: String(body.category || "spices"),
+    description: String(body.description || ""),
+    price: Math.max(1, Number(body.price) || 1),
+    mrp: Math.max(1, Number(body.mrp) || Number(body.price) || 1),
+    unit: String(body.unit || "pack"),
+    weight: String(body.weight || ""),
+    stock: Math.max(0, Number(body.stock) || 0),
+    tags: String(body.tags || ""),
+    accent: String(body.accent || "#0c4a46"),
+    imageUrl: String(body.imageUrl || ""),
+    imageUrl2: String(body.imageUrl2 || ""),
+    fssai: body.fssai !== false,
+  };
+}
+
 export async function POST(request: Request) {
   await ensureSeeded();
   const user = await requireUser(["admin", "seller"]);
@@ -30,19 +53,75 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as Record<string, unknown>;
   const name = String(body.name || "").trim();
+  if (!name) {
+    return NextResponse.json({ error: "Product name is required." }, { status: 400 });
+  }
+
+  // Sellers submit for admin approval — never overwrite live catalog directly.
+  if (user.role === "seller") {
+    const existingId = String(body.id || "").trim();
+    let previous: ProductProposal | null = null;
+    let requestType: "create" | "update" = "create";
+    if (existingId) {
+      const rows = await sql<Record<string, unknown>>(
+        `select * from catalog_products where id = $1 and seller_user_id = $2 limit 1`,
+        [existingId, user.id],
+      );
+      if (!rows[0]) {
+        return NextResponse.json({ error: "Product not found." }, { status: 404 });
+      }
+      const mapped = mapCatalogRow(rows[0] as never);
+      previous = {
+        id: mapped.id,
+        slug: mapped.slug,
+        name: mapped.name,
+        shortName: mapped.shortName,
+        category: mapped.category,
+        description: mapped.description,
+        price: mapped.price,
+        mrp: mapped.mrp,
+        unit: mapped.unit,
+        weight: mapped.weight,
+        stock: mapped.stock,
+        tags: mapped.tags.join(","),
+        accent: mapped.accent,
+        imageUrl: mapped.images[0] || "",
+        imageUrl2: mapped.images[1] || "",
+        fssai: mapped.fssai,
+      };
+      requestType = "update";
+    }
+    const proposed = proposalFromBody(body, existingId || undefined);
+    const requestId = await createProductRequest({
+      sellerUserId: user.id,
+      requestType,
+      productId: existingId || null,
+      proposed,
+      previous,
+    });
+    return NextResponse.json(
+      {
+        ok: true,
+        pendingApproval: true,
+        requestId,
+        message:
+          requestType === "create"
+            ? "Product submitted for admin approval."
+            : "Product update submitted for admin approval. Live listing unchanged until approved.",
+      },
+      { headers: { "cache-control": "private, no-store" } },
+    );
+  }
+
   const slug =
     String(body.slug || "")
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || `product-${Date.now()}`;
-  if (!name) {
-    return NextResponse.json({ error: "Product name is required." }, { status: 400 });
-  }
-
   const id = String(body.id || newId());
-  const sellerUserId = user.role === "seller" ? user.id : (body.sellerUserId as string) || null;
-  const fulfillment = user.role === "seller" ? "seller" : String(body.fulfillment || "internal");
+  const sellerUserId = (body.sellerUserId as string) || null;
+  const fulfillment = String(body.fulfillment || "internal");
 
   await sql(
     `insert into catalog_products (
@@ -64,12 +143,7 @@ export async function POST(request: Request) {
       image_url = excluded.image_url,
       image_url_2 = excluded.image_url_2,
       active = excluded.active,
-      updated_at = now()
-    where catalog_products.id = $1
-      and (
-        $20::text = 'admin'
-        or catalog_products.seller_user_id = $12
-      )`,
+      updated_at = now()`,
     [
       id,
       slug,
@@ -90,7 +164,6 @@ export async function POST(request: Request) {
       String(body.imageUrl2 || ""),
       body.fssai !== false,
       body.active !== false,
-      user.role,
     ],
   );
 
@@ -105,6 +178,9 @@ export async function DELETE(request: Request) {
   await ensureSeeded();
   const user = await requireUser(["admin", "seller"]);
   if (user instanceof NextResponse) return user;
+  if (user.role === "seller" && !user.shopApproved) {
+    return NextResponse.json({ error: "Seller account pending approval." }, { status: 403 });
+  }
   const id = new URL(request.url).searchParams.get("id");
   if (!id) {
     return NextResponse.json({ error: "Missing id." }, { status: 400 });

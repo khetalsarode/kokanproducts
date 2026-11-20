@@ -90,8 +90,8 @@ export async function POST(request: Request) {
     );
     if (role === "seller") {
       await sql(
-        `insert into seller_profiles (user_id, shop_name, location, bio, approved)
-         values ($1, $2, $3, $4, false)`,
+        `insert into seller_profiles (user_id, shop_name, location, bio, approved, registration_status)
+         values ($1, $2, $3, $4, false, 'pending')`,
         [
           id,
           (body.shopName ?? "").trim(),
