@@ -130,6 +130,27 @@ export function ProductDetail({
                 {product.stock > 0 ? `${product.stock} available` : "Out of stock"}
               </strong>
             </p>
+            {product.bestBefore ? (
+              <p>
+                <span className="text-ink/50">Best before </span>
+                <strong>{product.bestBefore}</strong>
+                {(product.shelfLifeDays || 0) > 0 ? (
+                  <span className="text-ink/50"> · shelf life {product.shelfLifeDays} days</span>
+                ) : null}
+              </p>
+            ) : null}
+            {product.storageInstructions ? (
+              <p>
+                <span className="text-ink/50">Storage </span>
+                <strong>{product.storageInstructions}</strong>
+              </p>
+            ) : null}
+            {product.allergens ? (
+              <p>
+                <span className="text-ink/50">Allergens </span>
+                <strong>{product.allergens}</strong>
+              </p>
+            ) : null}
           </div>
 
           {isStaff ? (

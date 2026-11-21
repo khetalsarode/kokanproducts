@@ -14,9 +14,17 @@ import {
   YAxis,
 } from "recharts";
 import { DashShell } from "@/components/dashboard/DashShell";
+import { FoodProductFields } from "@/components/dashboard/FoodProductFields";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { useAuth } from "@/context/AuthContext";
+import {
+  emptyFoodFields,
+  foodFieldsFromProduct,
+  shelfLifeLabel,
+  shelfLifeStatus,
+  type FoodInventoryFields,
+} from "@/lib/foodProduct";
 import { formatINR } from "@/lib/format";
 import type { Order, OrderStatus, Product } from "@/types";
 
@@ -126,6 +134,7 @@ export default function AdminPage() {
     imageUrl: "",
     description: "",
   });
+  const [food, setFood] = useState<FoodInventoryFields>(emptyFoodFields());
 
   useEffect(() => {
     if (!ready) return;
@@ -233,6 +242,7 @@ export default function AdminPage() {
         imageUrl: form.imageUrl,
         description: form.description,
         fulfillment: "internal",
+        ...food,
       }),
     });
     setMsg(res.ok ? "Product saved to catalogue." : "Could not save product.");
@@ -248,6 +258,7 @@ export default function AdminPage() {
         imageUrl: "",
         description: "",
       });
+      setFood(emptyFoodFields());
     }
     await load();
   }
@@ -290,6 +301,7 @@ export default function AdminPage() {
           badge: pendingRequests.length,
         },
         { id: "products", label: "Catalogue" },
+        { id: "inventory", label: "Warehouse & shelf life" },
         { id: "orders", label: "Orders" },
         { id: "reports", label: "Sales reports" },
       ]}
@@ -632,6 +644,7 @@ export default function AdminPage() {
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
+            <FoodProductFields value={food} onChange={setFood} />
             <button type="submit" className="btn-primary w-fit">
               {form.id ? "Update product" : "Add product"}
             </button>
@@ -653,7 +666,7 @@ export default function AdminPage() {
                     <th>Product</th>
                     <th>Seller</th>
                     <th>Price</th>
-                    <th>Stock</th>
+                    <th>Shop / WH</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -666,7 +679,9 @@ export default function AdminPage() {
                       </td>
                       <td className="text-xs">{p.sellerId}</td>
                       <td>{formatINR(p.price)}</td>
-                      <td>{p.stock}</td>
+                      <td className="text-xs">
+                        {p.stock} / {p.warehouseStock}
+                      </td>
                       <td>
                         <button
                           type="button"
@@ -683,6 +698,7 @@ export default function AdminPage() {
                               imageUrl: p.images[0] || "",
                               description: p.description,
                             });
+                            setFood(foodFieldsFromProduct(p));
                             setTab("products");
                           }}
                         >
@@ -694,6 +710,89 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "inventory" && (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <KpiCard
+              label="Warehouse units"
+              value={products.reduce((n, p) => n + (p.warehouseStock || 0), 0)}
+              accent="sea"
+            />
+            <KpiCard
+              label="Expiring in 30 days"
+              value={
+                products.filter((p) => shelfLifeStatus(p.bestBefore) === "expiring_soon")
+                  .length
+              }
+              accent="mango"
+              alert
+            />
+            <KpiCard
+              label="Expired batches"
+              value={products.filter((p) => shelfLifeStatus(p.bestBefore) === "expired").length}
+              accent="spice"
+              alert
+            />
+          </div>
+          <div className="dash-table-wrap">
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Warehouse</th>
+                  <th>Shop stock</th>
+                  <th>Shelf life</th>
+                  <th>Best before</th>
+                  <th>Batch / zone</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((p) => {
+                  const life = shelfLifeStatus(p.bestBefore);
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <p className="font-medium">{p.name}</p>
+                        <p className="text-xs text-ink/45">{p.category}</p>
+                      </td>
+                      <td>
+                        <p className="font-semibold tabular-nums">{p.warehouseStock}</p>
+                        <p className="text-xs text-ink/45">
+                          {p.warehouseLocation || "—"}
+                        </p>
+                      </td>
+                      <td className="tabular-nums">{p.stock}</td>
+                      <td>
+                        <StatusBadge
+                          status={
+                            life === "expired"
+                              ? "rejected"
+                              : life === "expiring_soon"
+                                ? "pending"
+                                : life === "ok"
+                                  ? "approved"
+                                  : "inactive"
+                          }
+                          label={shelfLifeLabel(life)}
+                        />
+                        {(p.shelfLifeDays || 0) > 0 ? (
+                          <p className="mt-1 text-xs text-ink/45">{p.shelfLifeDays} days</p>
+                        ) : null}
+                      </td>
+                      <td className="text-xs">{p.bestBefore || "—"}</td>
+                      <td className="text-xs">
+                        <p>{p.batchNumber || "—"}</p>
+                        <p className="text-ink/45 capitalize">{p.temperatureZone}</p>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

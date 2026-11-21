@@ -22,6 +22,18 @@ export type ProductProposal = {
   imageUrl: string;
   imageUrl2: string;
   fssai: boolean;
+  warehouseStock: number;
+  warehouseLocation: string;
+  shelfLifeDays: number;
+  manufacturedOn: string;
+  bestBefore: string;
+  batchNumber: string;
+  storageInstructions: string;
+  temperatureZone: string;
+  packagingType: string;
+  ingredients: string;
+  allergens: string;
+  fssaiLicense: string;
 };
 
 export async function setSellerRegistrationStatus(input: {
@@ -193,13 +205,32 @@ export async function applyApprovedProductRequest(
   const productId = row.product_id || proposed.id || newId();
   const slug = slugify(proposed.slug || proposed.name);
 
+  const foodParams = [
+    Math.max(0, Number(proposed.warehouseStock) || 0),
+    proposed.warehouseLocation || "",
+    Math.max(0, Number(proposed.shelfLifeDays) || 0),
+    proposed.manufacturedOn || null,
+    proposed.bestBefore || null,
+    proposed.batchNumber || "",
+    proposed.storageInstructions || "",
+    proposed.temperatureZone || "ambient",
+    proposed.packagingType || "",
+    proposed.ingredients || "",
+    proposed.allergens || "",
+    proposed.fssaiLicense || "",
+  ];
+
   if (row.request_type === "create") {
     await sql(
       `insert into catalog_products (
         id, slug, name, short_name, category, description, price, mrp, unit, weight,
-        stock, seller_user_id, fulfillment, tags, accent, image_url, image_url_2, fssai, active
+        stock, seller_user_id, fulfillment, tags, accent, image_url, image_url_2, fssai, active,
+        warehouse_stock, warehouse_location, shelf_life_days, manufactured_on, best_before,
+        batch_number, storage_instructions, temperature_zone, packaging_type, ingredients,
+        allergens, fssai_license
       ) values (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'seller',$13,$14,$15,$16,$17,true
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'seller',$13,$14,$15,$16,$17,true,
+        $18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29
       )
       on conflict (id) do update set
         slug = excluded.slug,
@@ -217,6 +248,18 @@ export async function applyApprovedProductRequest(
         image_url = excluded.image_url,
         image_url_2 = excluded.image_url_2,
         fssai = excluded.fssai,
+        warehouse_stock = excluded.warehouse_stock,
+        warehouse_location = excluded.warehouse_location,
+        shelf_life_days = excluded.shelf_life_days,
+        manufactured_on = excluded.manufactured_on,
+        best_before = excluded.best_before,
+        batch_number = excluded.batch_number,
+        storage_instructions = excluded.storage_instructions,
+        temperature_zone = excluded.temperature_zone,
+        packaging_type = excluded.packaging_type,
+        ingredients = excluded.ingredients,
+        allergens = excluded.allergens,
+        fssai_license = excluded.fssai_license,
         active = true,
         updated_at = now()`,
       [
@@ -237,6 +280,7 @@ export async function applyApprovedProductRequest(
         proposed.imageUrl || "",
         proposed.imageUrl2 || "",
         proposed.fssai !== false,
+        ...foodParams,
       ],
     );
   } else {
@@ -256,9 +300,21 @@ export async function applyApprovedProductRequest(
          image_url = $12,
          image_url_2 = $13,
          fssai = $14,
+         warehouse_stock = $15,
+         warehouse_location = $16,
+         shelf_life_days = $17,
+         manufactured_on = $18,
+         best_before = $19,
+         batch_number = $20,
+         storage_instructions = $21,
+         temperature_zone = $22,
+         packaging_type = $23,
+         ingredients = $24,
+         allergens = $25,
+         fssai_license = $26,
          active = true,
          updated_at = now()
-       where id = $15 and seller_user_id = $16`,
+       where id = $27 and seller_user_id = $28`,
       [
         proposed.name,
         proposed.shortName || proposed.name,
@@ -274,6 +330,7 @@ export async function applyApprovedProductRequest(
         proposed.imageUrl || "",
         proposed.imageUrl2 || "",
         proposed.fssai !== false,
+        ...foodParams,
         productId,
         row.seller_user_id,
       ],

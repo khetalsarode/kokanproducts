@@ -47,6 +47,18 @@ export interface Product {
   images: string[];
   fssai: boolean;
   reviews: Review[];
+  warehouseStock?: number;
+  warehouseLocation?: string;
+  shelfLifeDays?: number;
+  manufacturedOn?: string;
+  bestBefore?: string;
+  batchNumber?: string;
+  storageInstructions?: string;
+  temperatureZone?: "ambient" | "chilled" | "frozen";
+  packagingType?: string;
+  ingredients?: string;
+  allergens?: string;
+  fssaiLicense?: string;
 }
 
 export interface CartItem {

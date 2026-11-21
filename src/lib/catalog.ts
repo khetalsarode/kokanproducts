@@ -24,10 +24,31 @@ type CatalogRow = {
   image_url_2: string;
   fssai: boolean;
   active: boolean;
+  warehouse_stock?: number | null;
+  warehouse_location?: string | null;
+  shelf_life_days?: number | null;
+  manufactured_on?: Date | string | null;
+  best_before?: Date | string | null;
+  batch_number?: string | null;
+  storage_instructions?: string | null;
+  temperature_zone?: string | null;
+  packaging_type?: string | null;
+  ingredients?: string | null;
+  allergens?: string | null;
+  fssai_license?: string | null;
 };
+
+function dateOnly(value: Date | string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  if (typeof value === "string") return value.slice(0, 10);
+  return value.toISOString().slice(0, 10);
+}
 
 export function mapCatalogRow(row: CatalogRow): Product {
   const images = [row.image_url, row.image_url_2].filter(Boolean);
+  const zoneRaw = String(row.temperature_zone || "ambient");
+  const temperatureZone =
+    zoneRaw === "chilled" || zoneRaw === "frozen" ? zoneRaw : "ambient";
   return {
     id: row.id,
     slug: row.slug,
@@ -50,6 +71,18 @@ export function mapCatalogRow(row: CatalogRow): Product {
     images: images.length ? images : [`/products/${row.slug}.jpg`],
     fssai: Boolean(row.fssai),
     reviews: [],
+    warehouseStock: Number(row.warehouse_stock ?? row.stock ?? 0),
+    warehouseLocation: row.warehouse_location || "",
+    shelfLifeDays: Number(row.shelf_life_days ?? 0),
+    manufacturedOn: dateOnly(row.manufactured_on),
+    bestBefore: dateOnly(row.best_before),
+    batchNumber: row.batch_number || "",
+    storageInstructions: row.storage_instructions || "",
+    temperatureZone,
+    packagingType: row.packaging_type || "",
+    ingredients: row.ingredients || "",
+    allergens: row.allergens || "",
+    fssaiLicense: row.fssai_license || "",
   };
 }
 
@@ -70,7 +103,6 @@ export async function listCatalogProducts(opts?: {
     `select * from catalog_products ${clause} order by name asc`,
     params,
   );
-  // Database is the source of truth after seed. Do not fall back to hardcoded catalog.
   return rows.map(mapCatalogRow);
 }
 

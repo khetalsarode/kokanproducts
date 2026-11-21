@@ -14,9 +14,17 @@ import {
   YAxis,
 } from "recharts";
 import { DashShell } from "@/components/dashboard/DashShell";
+import { FoodProductFields } from "@/components/dashboard/FoodProductFields";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { useAuth } from "@/context/AuthContext";
+import {
+  emptyFoodFields,
+  foodFieldsFromProduct,
+  shelfLifeLabel,
+  shelfLifeStatus,
+  type FoodInventoryFields,
+} from "@/lib/foodProduct";
 import { formatINR } from "@/lib/format";
 import type { Order, OrderStatus, Product } from "@/types";
 
@@ -94,6 +102,7 @@ export default function SellerPage() {
     imageUrl: "",
     description: "",
   });
+  const [food, setFood] = useState<FoodInventoryFields>(emptyFoodFields());
 
   useEffect(() => {
     if (!ready) return;
@@ -151,6 +160,7 @@ export default function SellerPage() {
         stock: Number(form.stock),
         imageUrl: form.imageUrl,
         description: form.description,
+        ...food,
       }),
     });
     const data = (await res.json().catch(() => ({}))) as {
@@ -175,6 +185,7 @@ export default function SellerPage() {
         imageUrl: "",
         description: "",
       });
+      setFood(emptyFoodFields());
       setTab("requests");
     }
     await load();
@@ -220,6 +231,7 @@ export default function SellerPage() {
       nav={[
         { id: "overview", label: "Overview" },
         { id: "products", label: "My products" },
+        { id: "inventory", label: "Warehouse & shelf life" },
         { id: "submit", label: "Submit product" },
         { id: "requests", label: "Approval status", badge: pendingCount },
         { id: "orders", label: "Orders" },
@@ -351,55 +363,144 @@ export default function SellerPage() {
       {tab === "products" && (
         <div className="dash-table-wrap">
           <table className="dash-table">
-            <thead>
+                <thead>
               <tr>
                 <th>Product</th>
                 <th>Price</th>
-                <th>Stock</th>
-                <th>Status</th>
+                <th>Shop / WH</th>
+                <th>Shelf life</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {products.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <p className="font-medium">{p.name}</p>
-                    <p className="text-xs text-ink/45">{p.category}</p>
-                  </td>
-                  <td>{formatINR(p.price)}</td>
-                  <td>{p.stock}</td>
-                  <td>
-                    <StatusBadge status={p.stock > 0 ? "active" : "inactive"} />
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="text-xs font-semibold text-sea"
-                      disabled={!approved}
-                      onClick={() => {
-                        setForm({
-                          id: p.id,
-                          name: p.name,
-                          shortName: p.shortName,
-                          category: p.category,
-                          price: String(p.price),
-                          mrp: String(p.mrp),
-                          stock: String(p.stock),
-                          imageUrl: p.images[0] || "",
-                          description: p.description,
-                        });
-                        setTab("submit");
-                      }}
-                    >
-                      Request update
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {products.map((p) => {
+                const life = shelfLifeStatus(p.bestBefore);
+                return (
+                  <tr key={p.id}>
+                    <td>
+                      <p className="font-medium">{p.name}</p>
+                      <p className="text-xs text-ink/45">{p.category}</p>
+                    </td>
+                    <td>{formatINR(p.price)}</td>
+                    <td className="text-xs">
+                      {p.stock} / {p.warehouseStock}
+                    </td>
+                    <td>
+                      <StatusBadge
+                        status={
+                          life === "expired"
+                            ? "rejected"
+                            : life === "expiring_soon"
+                              ? "pending"
+                              : life === "ok"
+                                ? "approved"
+                                : "inactive"
+                        }
+                        label={shelfLifeLabel(life)}
+                      />
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-sea"
+                        disabled={!approved}
+                        onClick={() => {
+                          setForm({
+                            id: p.id,
+                            name: p.name,
+                            shortName: p.shortName,
+                            category: p.category,
+                            price: String(p.price),
+                            mrp: String(p.mrp),
+                            stock: String(p.stock),
+                            imageUrl: p.images[0] || "",
+                            description: p.description,
+                          });
+                          setFood(foodFieldsFromProduct(p));
+                          setTab("submit");
+                        }}
+                      >
+                        Request update
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {!products.length && <div className="dash-empty">No published products yet.</div>}
+        </div>
+      )}
+
+      {tab === "inventory" && (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <KpiCard
+              label="Warehouse units"
+              value={products.reduce((n, p) => n + (p.warehouseStock || 0), 0)}
+            />
+            <KpiCard
+              label="Expiring soon"
+              value={
+                products.filter((p) => shelfLifeStatus(p.bestBefore) === "expiring_soon")
+                  .length
+              }
+              accent="mango"
+              alert
+            />
+            <KpiCard
+              label="Expired"
+              value={products.filter((p) => shelfLifeStatus(p.bestBefore) === "expired").length}
+              accent="spice"
+              alert
+            />
+          </div>
+          <div className="dash-table-wrap">
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Warehouse qty</th>
+                  <th>Location</th>
+                  <th>Best before</th>
+                  <th>Batch</th>
+                  <th>Storage</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <p className="font-medium">{p.name}</p>
+                      <StatusBadge
+                        status={
+                          shelfLifeStatus(p.bestBefore) === "expired"
+                            ? "rejected"
+                            : shelfLifeStatus(p.bestBefore) === "expiring_soon"
+                              ? "pending"
+                              : "approved"
+                        }
+                        label={shelfLifeLabel(shelfLifeStatus(p.bestBefore))}
+                      />
+                    </td>
+                    <td className="tabular-nums font-semibold">{p.warehouseStock}</td>
+                    <td className="text-xs">{p.warehouseLocation || "—"}</td>
+                    <td className="text-xs">{p.bestBefore || "—"}</td>
+                    <td className="text-xs">{p.batchNumber || "—"}</td>
+                    <td className="text-xs capitalize">
+                      {p.temperatureZone}
+                      {p.storageInstructions ? (
+                        <p className="mt-1 text-ink/45">{p.storageInstructions}</p>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!products.length && (
+              <div className="dash-empty">No inventory yet. Submit a food product to begin.</div>
+            )}
+          </div>
         </div>
       )}
 
@@ -471,6 +572,7 @@ export default function SellerPage() {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             disabled={!approved}
           />
+          <FoodProductFields value={food} onChange={setFood} disabled={!approved} />
           <button type="submit" className="btn-primary w-fit" disabled={!approved}>
             {form.id ? "Submit update for approval" : "Submit for approval"}
           </button>
