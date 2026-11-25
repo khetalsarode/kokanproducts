@@ -31,7 +31,7 @@ type AuthContextValue = {
   customer: AuthCustomer | null;
   refresh: () => Promise<void>;
   login: (
-    email: string,
+    identifier: string,
     password: string,
     expectedRole?: AuthRole,
   ) => Promise<string | null>;
@@ -43,6 +43,11 @@ type AuthContextValue = {
     role?: "customer" | "seller";
     shopName?: string;
     location?: string;
+    businessAddress?: string;
+    gstin?: string;
+    fssaiLicense?: string;
+    channel?: "email" | "phone";
+    verificationToken?: string;
   }) => Promise<string | null>;
   logout: () => Promise<void>;
   updateProfile: (input: { name: string; phone: string }) => Promise<string | null>;
@@ -92,11 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const login = useCallback(
-    async (email: string, password: string, expectedRole?: AuthRole) => {
+    async (identifier: string, password: string, expectedRole?: AuthRole) => {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password, expectedRole }),
+        body: JSON.stringify({ identifier, email: identifier, password, expectedRole }),
       });
       if (!res.ok) return readError(res);
       const data = (await res.json()) as { customer: AuthCustomer };
@@ -115,6 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role?: "customer" | "seller";
       shopName?: string;
       location?: string;
+      businessAddress?: string;
+      gstin?: string;
+      fssaiLicense?: string;
+      channel?: "email" | "phone";
+      verificationToken?: string;
     }) => {
       const res = await fetch("/api/auth/register", {
         method: "POST",

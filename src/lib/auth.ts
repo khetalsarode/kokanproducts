@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { sql } from "./db";
+import { normalizePhone } from "./phone";
 
 export const SESSION_COOKIE = "kp_session";
 const SESSION_DAYS = 30;
@@ -113,6 +114,36 @@ export async function getUserByEmail(
   const row = rows[0];
   if (!row) return null;
   return { ...mapUser(row), passwordHash: row.password_hash };
+}
+
+export async function getUserByPhone(
+  phone: string,
+): Promise<(AuthUser & { passwordHash: string }) | null> {
+  const rows = await sql<UserRow & { password_hash: string }>(
+    `select ${USER_SELECT}, c.password_hash
+     from customers c
+     left join seller_profiles sp on sp.user_id = c.id
+     where c.phone = $1 and c.phone <> ''
+     limit 1`,
+    [phone.trim()],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return { ...mapUser(row), passwordHash: row.password_hash };
+}
+
+/** Look up by email or phone (customers may sign in with either). */
+export async function getUserByLoginIdentifier(
+  identifier: string,
+): Promise<(AuthUser & { passwordHash: string }) | null> {
+  const raw = identifier.trim();
+  if (!raw) return null;
+  if (raw.includes("@")) {
+    return getUserByEmail(raw.toLowerCase());
+  }
+  const phone = normalizePhone(raw);
+  if (!phone) return null;
+  return getUserByPhone(phone);
 }
 
 /** @deprecated */

@@ -76,9 +76,17 @@ export function Header() {
                   : customer.name.split(" ")[0]}
             </Link>
           ) : (
-            <Link href="/login" className="hidden text-ink/70 hover:text-sea sm:inline">
-              Sign in
-            </Link>
+            <div className="hidden items-center gap-3 sm:flex">
+              <Link href="/customer/login" className="text-ink/70 hover:text-sea">
+                Customer
+              </Link>
+              <Link href="/seller/login" className="text-ink/70 hover:text-sea">
+                Seller
+              </Link>
+              <Link href="/login" className="text-ink/45 hover:text-sea">
+                All portals
+              </Link>
+            </div>
           )}
           {showShopActions && (
             <Link href="/cart" className="nav-icon" aria-label="Cart">
@@ -109,12 +117,14 @@ export function Header() {
             );
           })}
           {!customer && (
-            <Link
-              href="/customer/register"
-              className="ml-auto self-center text-xs font-medium text-spice hover:underline"
-            >
-              Create account
-            </Link>
+            <div className="ml-auto flex items-center gap-3 self-center text-xs font-medium">
+              <Link href="/customer/register" className="text-spice hover:underline">
+                Customer register
+              </Link>
+              <Link href="/seller/register" className="text-sea hover:underline">
+                Sell with us
+              </Link>
+            </div>
           )}
         </nav>
       </div>
@@ -149,15 +159,22 @@ export function Header() {
               </Link>
             ) : (
               <>
-                <Link href="/login" onClick={() => setOpen(false)} className="py-1 text-sea">
-                  Sign in
+                <Link
+                  href="/customer/login"
+                  onClick={() => setOpen(false)}
+                  className="py-1 text-sea"
+                >
+                  Customer sign in
                 </Link>
                 <Link
                   href="/customer/register"
                   onClick={() => setOpen(false)}
                   className="py-1 text-sea"
                 >
-                  Create account
+                  Customer register
+                </Link>
+                <Link href="/seller/login" onClick={() => setOpen(false)} className="py-1 text-sea">
+                  Seller sign in
                 </Link>
                 <Link
                   href="/seller/register"

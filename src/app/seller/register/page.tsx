@@ -14,6 +14,9 @@ export default function SellerRegisterPage() {
     phone: "",
     shopName: "",
     location: "Konkan, Maharashtra",
+    businessAddress: "",
+    gstin: "",
+    fssaiLicense: "",
     password: "",
     confirm: "",
   });
@@ -42,6 +45,9 @@ export default function SellerRegisterPage() {
       role: "seller",
       shopName: form.shopName,
       location: form.location,
+      businessAddress: form.businessAddress,
+      gstin: form.gstin,
+      fssaiLicense: form.fssaiLicense,
     });
     setBusy(false);
     if (err) {
@@ -54,41 +60,61 @@ export default function SellerRegisterPage() {
   return (
     <RoleAuthShell role="seller" mode="register">
       <p className="mb-4 text-sm text-ink/55">
-        New seller shops stay pending until an admin approves them under Admin → Users.
+        After you register, your shop stays <strong>Pending Approval</strong> until an admin
+        reviews it. You can sign in, but catalogue tools unlock only after approval.
       </p>
       <form onSubmit={onSubmit} className="grid gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">
+          Personal details
+        </p>
         {(
           [
-            ["name", "Your full name"],
-            ["email", "Email"],
-            ["phone", "Phone"],
-            ["shopName", "Shop / brand name"],
-            ["location", "Location"],
-            ["password", "Password"],
-            ["confirm", "Confirm password"],
+            ["name", "Your full name", "text"],
+            ["email", "Email", "email"],
+            ["phone", "Mobile number", "tel"],
+            ["password", "Password", "password"],
+            ["confirm", "Confirm password", "password"],
           ] as const
-        ).map(([key, label]) => (
+        ).map(([key, label, type]) => (
           <label key={key} className="grid gap-1 text-sm">
             <span className="text-ink/70">{label}</span>
             <input
               className="field"
-              type={
-                key.includes("password") || key === "confirm"
-                  ? "password"
-                  : key === "email"
-                    ? "email"
-                    : "text"
-              }
+              type={type}
               value={form[key]}
               onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-              required={key !== "phone"}
-              minLength={key.includes("password") || key === "confirm" ? 8 : undefined}
+              required
+              minLength={key === "password" || key === "confirm" ? 8 : undefined}
+            />
+          </label>
+        ))}
+
+        <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">
+          Business details
+        </p>
+        {(
+          [
+            ["shopName", "Shop / brand name", "text", true],
+            ["location", "City / region", "text", true],
+            ["businessAddress", "Business address", "text", false],
+            ["gstin", "GSTIN (optional)", "text", false],
+            ["fssaiLicense", "FSSAI license (optional)", "text", false],
+          ] as const
+        ).map(([key, label, type, required]) => (
+          <label key={key} className="grid gap-1 text-sm">
+            <span className="text-ink/70">{label}</span>
+            <input
+              className="field"
+              type={type}
+              value={form[key]}
+              onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+              required={required}
             />
           </label>
         ))}
         {error && <p className="text-sm text-spice">{error}</p>}
         <button type="submit" className="btn-primary w-fit" disabled={busy}>
-          {busy ? "Creating…" : "Create seller account"}
+          {busy ? "Submitting…" : "Submit seller registration"}
         </button>
       </form>
     </RoleAuthShell>

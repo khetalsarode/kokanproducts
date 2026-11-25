@@ -5,25 +5,44 @@ import type { AuthRole } from "@/context/AuthContext";
 
 const copy: Record<
   AuthRole,
-  { eyebrow: string; title: string; blurb: string; home: string }
+  {
+    eyebrow: string;
+    titleLogin: string;
+    titleRegister: string;
+    blurbLogin: string;
+    blurbRegister: string;
+    home: string;
+    accentClass: string;
+  }
 > = {
   customer: {
-    eyebrow: "Customer",
-    title: "Shop & track orders",
-    blurb: "Sign in to checkout, save addresses, and follow deliveries.",
+    eyebrow: "Customer portal",
+    titleLogin: "Welcome back",
+    titleRegister: "Create your shopper account",
+    blurbLogin: "Sign in with email or mobile to checkout, save addresses, and track orders.",
+    blurbRegister:
+      "Register with email verification or mobile OTP — then shop Konkan staples.",
     home: "/account",
+    accentClass: "from-lagoon/15 via-foam to-sand/40",
   },
   seller: {
-    eyebrow: "Seller",
-    title: "Manage your Konkan shop",
-    blurb: "Sign in to list products and update orders for your catalogue.",
+    eyebrow: "Seller portal",
+    titleLogin: "Seller sign in",
+    titleRegister: "Apply to sell with us",
+    blurbLogin: "Access your shop, warehouse stock, and order desk after admin approval.",
+    blurbRegister:
+      "Share personal and business details. New shops stay pending until an admin approves you.",
     home: "/seller",
+    accentClass: "from-mango/20 via-foam to-mist/50",
   },
   admin: {
-    eyebrow: "Admin",
-    title: "Operations console",
-    blurb: "Sign in to manage catalogue, users, seller approvals, and orders.",
+    eyebrow: "Admin portal",
+    titleLogin: "Operations console",
+    titleRegister: "Admin access",
+    blurbLogin: "Secure sign-in for authorised KonkanProducts administrators only.",
+    blurbRegister: "Admin accounts are provisioned — public registration is closed.",
     home: "/admin",
+    accentClass: "from-sea/20 via-foam to-mist/40",
   },
 };
 
@@ -40,83 +59,71 @@ export function RoleAuthShell({
   const loginHref =
     role === "customer" ? "/customer/login" : role === "seller" ? "/seller/login" : "/admin/login";
   const registerHref =
-    role === "customer"
-      ? "/customer/register"
-      : role === "seller"
-        ? "/seller/register"
-        : "/admin/register";
+    role === "customer" ? "/customer/register" : role === "seller" ? "/seller/register" : null;
 
   return (
-    <div className="section !pt-10 max-w-lg">
-      <BrandLogo href="/" />
-      <p className="mt-6 text-xs uppercase tracking-[0.2em] text-lagoon">{c.eyebrow}</p>
-      <h1 className="mt-2 font-display text-4xl text-ink">
-        {mode === "login" ? "Sign in" : "Create account"}
-      </h1>
-      <p className="mt-2 text-ink/60">{c.blurb}</p>
+    <div className="section !pt-8 !pb-16">
+      <div
+        className={`mx-auto max-w-lg overflow-hidden rounded-2xl border border-sea/10 bg-gradient-to-br ${c.accentClass} p-6 shadow-[0_20px_50px_-28px_rgba(12,74,70,0.45)] sm:p-8`}
+      >
+        <BrandLogo href="/" />
+        <p className="mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-sea/70">
+          {c.eyebrow}
+        </p>
+        <h1 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
+          {mode === "login" ? c.titleLogin : c.titleRegister}
+        </h1>
+        <p className="mt-2 text-sm text-ink/60 sm:text-base">
+          {mode === "login" ? c.blurbLogin : c.blurbRegister}
+        </p>
 
-      <div className="mt-6 flex flex-wrap gap-2 text-xs">
-        {(
-          [
-            ["customer", "Customer"],
-            ["seller", "Seller"],
-            ["admin", "Admin"],
-          ] as const
-        ).map(([r, label]) => (
-          <Link
-            key={r}
-            href={
-              mode === "login"
-                ? r === "customer"
-                  ? "/customer/login"
-                  : r === "seller"
-                    ? "/seller/login"
-                    : "/admin/login"
-                : r === "customer"
-                  ? "/customer/register"
-                  : r === "seller"
-                    ? "/seller/register"
-                    : "/admin/register"
-            }
-            className={`rounded-sm border px-3 py-1.5 transition ${
-              r === role
-                ? "border-sea bg-white/80 text-sea"
-                : "border-sea/15 text-ink/55 hover:border-sea/40"
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
+        <div className="mt-8 rounded-xl border border-white/60 bg-white/70 p-4 backdrop-blur-sm sm:p-5">
+          {children}
+        </div>
+
+        <div className="mt-6 space-y-2 text-sm text-ink/60">
+          {mode === "login" ? (
+            registerHref ? (
+              <p>
+                Need an account?{" "}
+                <Link href={registerHref} className="font-medium text-sea hover:underline">
+                  {role === "seller" ? "Register as a seller" : "Create a customer account"}
+                </Link>
+              </p>
+            ) : (
+              <p className="text-ink/50">Admin registration is not available publicly.</p>
+            )
+          ) : (
+            <p>
+              Already registered?{" "}
+              <Link href={loginHref} className="font-medium text-sea hover:underline">
+                Sign in
+              </Link>
+            </p>
+          )}
+          <p className="text-xs text-ink/45">
+            <Link href={c.home} className="hover:text-sea hover:underline">
+              {c.eyebrow.replace(" portal", "")} home
+            </Link>
+            {role === "customer" && (
+              <>
+                {" · "}
+                <Link href="/seller/login" className="hover:text-sea hover:underline">
+                  Seller sign in
+                </Link>
+              </>
+            )}
+            {role === "seller" && (
+              <>
+                {" · "}
+                <Link href="/customer/login" className="hover:text-sea hover:underline">
+                  Customer sign in
+                </Link>
+              </>
+            )}
+          </p>
+        </div>
       </div>
-
-      <div className="mt-8">{children}</div>
-
-      <p className="mt-6 text-sm text-ink/60">
-        {mode === "login" ? (
-          <>
-            Need an account?{" "}
-            <Link href={registerHref} className="font-medium text-sea hover:underline">
-              Register as {c.eyebrow.toLowerCase()}
-            </Link>
-          </>
-        ) : (
-          <>
-            Already registered?{" "}
-            <Link href={loginHref} className="font-medium text-sea hover:underline">
-              Sign in
-            </Link>
-          </>
-        )}
-      </p>
-      <p className="mt-2 text-sm text-ink/50">
-        <Link href="/login" className="hover:text-sea hover:underline">
-          All sign-in options
-        </Link>
-        {" · "}
-        <Link href={c.home} className="hover:text-sea hover:underline">
-          {c.eyebrow} home
-        </Link>
-      </p>
     </div>
   );
 }
