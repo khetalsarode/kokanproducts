@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { RolePortalSelect } from "@/components/RolePortalSelect";
 import type { AuthRole } from "@/context/AuthContext";
 
 const copy: Record<
@@ -77,7 +78,11 @@ export function RoleAuthShell({
           {mode === "login" ? c.blurbLogin : c.blurbRegister}
         </p>
 
-        <div className="mt-8 rounded-xl border border-white/60 bg-white/70 p-4 backdrop-blur-sm sm:p-5">
+        <div className="mt-6">
+          <RolePortalSelect currentRole={role} mode={mode} />
+        </div>
+
+        <div className="mt-6 rounded-xl border border-white/60 bg-white/70 p-4 backdrop-blur-sm sm:p-5">
           {children}
         </div>
 
