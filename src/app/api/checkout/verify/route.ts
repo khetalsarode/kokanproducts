@@ -4,17 +4,19 @@ import { getShopOrder, markOrderPaid } from "@/lib/orders";
 import { fetchCashfreeOrderStatus } from "@/lib/payments";
 import { rateLimit } from "@/lib/rateLimit";
 import { ensureSeeded } from "@/lib/seed";
+import { releaseAbandonedPaymentHolds } from "@/lib/stockHolds";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   await ensureSeeded();
+  await releaseAbandonedPaymentHolds();
   const user = await getRequestUser();
   if (!user) {
     return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   }
 
-  const limited = rateLimit(`checkout-verify:${user.id}`, 20, 60_000);
+  const limited = await rateLimit(`checkout-verify:${user.id}`, 20, 60_000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: `Too many payment checks. Try again in ${limited.retryAfterSec}s.` },

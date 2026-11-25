@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       destination = normalizePhone(destination);
     }
 
-    const limited = rateLimit(`otp:${channel}:${destination}`, 5, 60_000);
+    const limited = await rateLimit(`otp:${channel}:${destination}`, 5, 60_000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: `Too many codes requested. Try again in ${limited.retryAfterSec}s.` },
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       purpose,
     });
     if (!issued.ok) {
-      return NextResponse.json({ error: issued.error }, { status: 400 });
+      return NextResponse.json({ error: issued.error }, { status: 503 });
     }
 
     return NextResponse.json(
@@ -80,12 +80,10 @@ export async function POST(request: Request) {
         channel,
         destination,
         purpose,
-        delivery: issued.demoCode ? "demo" : "live",
-        ...(issued.demoCode ? { demoCode: issued.demoCode } : {}),
-        message: issued.demoCode
-          ? "Verification code ready (sample delivery — no SMS/email provider configured)."
-          : channel === "email"
-            ? "Verification code sent to your email."
+        delivery: "live",
+        message:
+          channel === "email"
+            ? "Verification code sent to your email. Check your inbox."
             : "OTP sent to your mobile number.",
       },
       { headers: { "cache-control": "private, no-store" } },

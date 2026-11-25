@@ -21,7 +21,6 @@ export default function CustomerRegisterPage() {
     confirm: "",
     code: "",
   });
-  const [demoCode, setDemoCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,7 +39,6 @@ export default function CustomerRegisterPage() {
     setBusy(true);
     setError(null);
     setInfo(null);
-    setDemoCode(null);
     if (form.password !== form.confirm) {
       setBusy(false);
       setError("Passwords do not match.");
@@ -68,14 +66,12 @@ export default function CustomerRegisterPage() {
     const data = (await res.json().catch(() => ({}))) as {
       error?: string;
       message?: string;
-      demoCode?: string;
     };
     setBusy(false);
     if (!res.ok) {
       setError(data.error || "Could not send verification code.");
       return;
     }
-    setDemoCode(data.demoCode || null);
     setInfo(data.message || "Verification code sent.");
     setStep("code");
   }
@@ -138,7 +134,6 @@ export default function CustomerRegisterPage() {
               setChannel(key);
               setError(null);
               setInfo(null);
-              setDemoCode(null);
             }}
             className={`rounded-md px-3 py-2 text-sm font-medium transition ${
               channel === key
@@ -229,6 +224,11 @@ export default function CustomerRegisterPage() {
               minLength={8}
             />
           </label>
+          <p className="text-xs text-ink/50">
+            {channel === "email"
+              ? "A verification code is emailed to you (requires Resend secrets)."
+              : "An OTP is texted to you (requires Twilio SMS secrets)."}
+          </p>
           {error && <p className="text-sm text-spice">{error}</p>}
           <button type="submit" className="btn-primary w-fit" disabled={busy}>
             {busy
@@ -244,13 +244,7 @@ export default function CustomerRegisterPage() {
             Enter the 6-digit code sent to{" "}
             <span className="font-medium text-ink">{destination()}</span>.
           </p>
-          {demoCode && (
-            <p className="rounded-lg border border-mango/30 bg-mango/10 px-3 py-2 text-sm text-ink/75">
-              Sample verification code (no SMS/email provider configured):{" "}
-              <strong className="tracking-widest">{demoCode}</strong>
-            </p>
-          )}
-          {info && !demoCode && <p className="text-sm text-lagoon">{info}</p>}
+          {info && <p className="text-sm text-lagoon">{info}</p>}
           <label className="grid gap-1 text-sm">
             <span className="text-ink/70">Verification code</span>
             <input
@@ -276,7 +270,6 @@ export default function CustomerRegisterPage() {
               onClick={() => {
                 setStep("details");
                 setForm({ ...form, code: "" });
-                setDemoCode(null);
                 setInfo(null);
                 setError(null);
               }}

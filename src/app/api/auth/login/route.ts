@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       ? (body.expectedRole as UserRole)
       : undefined;
 
-    const limited = rateLimit(`login:${loginKey || "unknown"}`, 10, 60_000);
+    const limited = await rateLimit(`login:${loginKey || "unknown"}`, 10, 60_000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: `Too many sign-in attempts. Try again in ${limited.retryAfterSec}s.` },

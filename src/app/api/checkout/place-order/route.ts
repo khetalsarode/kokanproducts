@@ -10,6 +10,7 @@ import {
 } from "@/lib/payments";
 import { rateLimit } from "@/lib/rateLimit";
 import { ensureSeeded } from "@/lib/seed";
+import { paymentHoldUntil, releaseAbandonedPaymentHolds } from "@/lib/stockHolds";
 import type { Address, Fulfillment, Order, OrderLine, PaymentMethod } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
   const reserved: OrderLine[] = [];
   try {
     await ensureSeeded();
+    await releaseAbandonedPaymentHolds();
     const user = await getRequestUser();
     if (!user || user.role !== "customer") {
       return NextResponse.json(
@@ -54,7 +56,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const limited = rateLimit(`checkout:${user.id}`, 8, 60_000);
+    const limited = await rateLimit(`checkout:${user.id}`, 8, 60_000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: `Too many checkout attempts. Try again in ${limited.retryAfterSec}s.` },
@@ -202,15 +204,16 @@ export async function POST(request: Request) {
     }
 
     const paymentStatus = method === "cod" ? "pending" : "awaiting_gateway";
+    const holdUntil = method === "online" ? paymentHoldUntil() : null;
     const address = { ...body.address, id: body.address.id || newId() };
 
     await sql(
       `insert into shop_orders (
         id, customer_id, status, payment_method, payment_status, payment_provider,
         subtotal, discount, delivery_fee, total, coupon_code, tracking_id, courier,
-        estimated_delivery, address_json, items_json
+        estimated_delivery, address_json, items_json, payment_hold_until
       ) values (
-        $1,$2,'placed',$3,$4,$5,$6,$7,$8,$9,$10,$11,'Delhivery',$12,$13::jsonb,$14::jsonb
+        $1,$2,'placed',$3,$4,$5,$6,$7,$8,$9,$10,$11,'Delhivery',$12,$13::jsonb,$14::jsonb,$15
       )`,
       [
         orderId,
@@ -227,6 +230,7 @@ export async function POST(request: Request) {
         eta.toISOString(),
         JSON.stringify(address),
         JSON.stringify(reserved),
+        holdUntil ? holdUntil.toISOString() : null,
       ],
     );
 

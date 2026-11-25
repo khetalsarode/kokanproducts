@@ -87,7 +87,8 @@ export type OrderStatus =
   | "packed"
   | "shipped"
   | "out_for_delivery"
-  | "delivered";
+  | "delivered"
+  | "cancelled";
 
 export interface OrderLine {
   productId: string;

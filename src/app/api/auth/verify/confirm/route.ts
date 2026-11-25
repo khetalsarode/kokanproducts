@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       destination = normalizePhone(destination);
     }
 
-    const limited = rateLimit(`otp-confirm:${channel}:${destination}`, 20, 60_000);
+    const limited = await rateLimit(`otp-confirm:${channel}:${destination}`, 20, 60_000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: `Too many attempts. Try again in ${limited.retryAfterSec}s.` },

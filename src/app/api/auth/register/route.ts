@@ -97,20 +97,38 @@ export async function POST(request: Request) {
         );
       }
     } else {
-      // Sellers always register with email (+ optional phone).
+      // Sellers register with verified email (+ required phone).
       if (!isValidEmail(email) || isPhoneAccountEmail(email)) {
         return NextResponse.json({ error: "Enter a valid email." }, { status: 400 });
       }
-      if (phone && !isValidPhone(phone)) {
+      if (!isValidPhone(phone)) {
         return NextResponse.json(
           { error: "Enter a valid mobile number." },
           { status: 400 },
         );
       }
-      if (phone) phone = normalizePhone(phone);
+      phone = normalizePhone(phone);
+      if (!verificationToken) {
+        return NextResponse.json(
+          { error: "Complete email verification first." },
+          { status: 400 },
+        );
+      }
+      const verified = await consumeVerificationToken({
+        token: verificationToken,
+        channel: "email",
+        destination: email,
+        purpose: "register",
+      });
+      if (!verified) {
+        return NextResponse.json(
+          { error: "Verification expired or invalid. Request a new code." },
+          { status: 400 },
+        );
+      }
     }
 
-    const limited = rateLimit(`register:${email || phone || "unknown"}`, 5, 60_000);
+    const limited = await rateLimit(`register:${email || phone || "unknown"}`, 5, 60_000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: `Too many registrations. Try again in ${limited.retryAfterSec}s.` },

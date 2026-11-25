@@ -1,5 +1,11 @@
 import { createHash, randomInt } from "node:crypto";
 import { newId, hashToken } from "@/lib/auth";
+import {
+  deliverEmailOtp,
+  deliverSmsOtp,
+  emailOtpConfigured,
+  smsOtpConfigured,
+} from "@/lib/otpDelivery";
 import { sql } from "@/lib/db";
 
 export type VerifyChannel = "email" | "phone";
@@ -17,19 +23,31 @@ function generateCode(): string {
   return String(randomInt(100000, 999999));
 }
 
-/** Demo delivery when no real SMS/email provider is configured. */
-export function otpDemoMode(): boolean {
-  const mode = (process.env.AUTH_OTP_DELIVERY || "demo").trim().toLowerCase();
-  return mode !== "live";
-}
-
 export async function issueVerificationCode(input: {
   channel: VerifyChannel;
   destination: string;
   purpose: VerifyPurpose;
-}): Promise<{ ok: true; demoCode?: string } | { ok: false; error: string }> {
-  const destination = input.destination.trim().toLowerCase();
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const destination =
+    input.channel === "email"
+      ? input.destination.trim().toLowerCase()
+      : input.destination.trim();
   if (!destination) return { ok: false, error: "Enter a valid destination." };
+
+  if (input.channel === "email" && !emailOtpConfigured()) {
+    return {
+      ok: false,
+      error:
+        "Email verification is not configured yet. Add RESEND_API_KEY and AUTH_OTP_FROM_EMAIL in Secrets, then try again.",
+    };
+  }
+  if (input.channel === "phone" && !smsOtpConfigured()) {
+    return {
+      ok: false,
+      error:
+        "Mobile OTP is not configured yet. Register with email, or add Twilio SMS secrets.",
+    };
+  }
 
   // Invalidate prior open codes for this destination/purpose
   await sql(
@@ -48,10 +66,22 @@ export async function issueVerificationCode(input: {
     [newId(), input.channel, destination, input.purpose, hashCode(code), expires.toISOString()],
   );
 
-  // Real SMS/email providers would send here when AUTH_OTP_DELIVERY=live.
-  if (otpDemoMode()) {
-    return { ok: true, demoCode: code };
+  try {
+    if (input.channel === "email") {
+      await deliverEmailOtp(destination, code);
+    } else {
+      await deliverSmsOtp(destination, code);
+    }
+  } catch (err) {
+    await sql(`update auth_verification_codes set consumed_at = now() where code_hash = $1`, [
+      hashCode(code),
+    ]);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not deliver verification code.",
+    };
   }
+
   return { ok: true };
 }
 
@@ -61,7 +91,10 @@ export async function confirmVerificationCode(input: {
   purpose: VerifyPurpose;
   code: string;
 }): Promise<{ ok: true; verificationToken: string } | { ok: false; error: string }> {
-  const destination = input.destination.trim().toLowerCase();
+  const destination =
+    input.channel === "email"
+      ? input.destination.trim().toLowerCase()
+      : input.destination.trim();
   const code = input.code.trim();
   if (!/^\d{6}$/.test(code)) {
     return { ok: false, error: "Enter the 6-digit verification code." };
@@ -137,7 +170,10 @@ export async function consumeVerificationToken(input: {
   destination: string;
   purpose: VerifyPurpose;
 }): Promise<boolean> {
-  const destination = input.destination.trim().toLowerCase();
+  const destination =
+    input.channel === "email"
+      ? input.destination.trim().toLowerCase()
+      : input.destination.trim();
   const rows = await sql<{ id: string; expires_at: Date | string }>(
     `select id, expires_at from auth_verification_tokens
      where token_hash = $1
