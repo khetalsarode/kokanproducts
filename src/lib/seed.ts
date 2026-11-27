@@ -95,13 +95,15 @@ async function ensureUserFromEnv(input: {
 
   if (input.shop) {
     await sql(
-      `insert into seller_profiles (user_id, shop_name, location, bio, approved, registration_status)
-       values ($1,$2,$3,$4,true,'approved')
+      `insert into seller_profiles
+         (user_id, shop_name, location, bio, approved, registration_status, business_category_id)
+       values ($1,$2,$3,$4,true,'approved','food-restaurant')
        on conflict (user_id) do update set
          shop_name = excluded.shop_name,
          location = excluded.location,
          approved = true,
-         registration_status = 'approved'`,
+         registration_status = 'approved',
+         business_category_id = coalesce(seller_profiles.business_category_id, 'food-restaurant')`,
       [id, input.shop.name, input.shop.location, input.shop.bio || ""],
     );
   }
@@ -202,6 +204,10 @@ async function ensureRoleAccounts() {
  */
 export async function ensureSeeded(): Promise<void> {
   try {
+    const { ensureBusinessCategoriesAndAgreements } = await import(
+      "@/lib/sellerAgreements"
+    );
+    await ensureBusinessCategoriesAndAgreements();
     await ensureRoleAccounts();
     await ensureCatalog();
   } catch (error) {

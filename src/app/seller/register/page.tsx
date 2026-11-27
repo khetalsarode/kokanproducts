@@ -7,10 +7,17 @@ import { useAuth } from "@/context/AuthContext";
 
 type Step = "details" | "code";
 
+type CategoryOption = {
+  id: string;
+  name: string;
+  description: string;
+};
+
 export default function SellerRegisterPage() {
   const { register, customer, ready } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState<Step>("details");
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -20,6 +27,7 @@ export default function SellerRegisterPage() {
     businessAddress: "",
     gstin: "",
     fssaiLicense: "",
+    businessCategoryId: "",
     password: "",
     confirm: "",
     code: "",
@@ -34,6 +42,15 @@ export default function SellerRegisterPage() {
     }
   }, [ready, customer, router]);
 
+  useEffect(() => {
+    void fetch("/api/seller/categories")
+      .then((r) => r.json())
+      .then((data: { categories?: CategoryOption[] }) => {
+        setCategories(data.categories || []);
+      })
+      .catch(() => setCategories([]));
+  }, []);
+
   async function sendCode() {
     setBusy(true);
     setError(null);
@@ -46,6 +63,11 @@ export default function SellerRegisterPage() {
     if (form.password.length < 8) {
       setBusy(false);
       setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (!form.businessCategoryId) {
+      setBusy(false);
+      setError("Select your business category.");
       return;
     }
     const res = await fetch("/api/auth/verify/request", {
@@ -110,6 +132,7 @@ export default function SellerRegisterPage() {
       businessAddress: form.businessAddress,
       gstin: form.gstin,
       fssaiLicense: form.fssaiLicense,
+      businessCategoryId: form.businessCategoryId,
       channel: "email",
       verificationToken: confirmData.verificationToken,
     });
@@ -158,6 +181,29 @@ export default function SellerRegisterPage() {
             <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">
               Business details
             </p>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink/70">Business category</span>
+              <select
+                className="field"
+                value={form.businessCategoryId}
+                onChange={(e) =>
+                  setForm({ ...form, businessCategoryId: e.target.value })
+                }
+                required
+              >
+                <option value="">Select category…</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              {form.businessCategoryId ? (
+                <span className="text-xs text-ink/45">
+                  {categories.find((c) => c.id === form.businessCategoryId)?.description}
+                </span>
+              ) : null}
+            </label>
             {(
               [
                 ["shopName", "Shop / brand name", "text", true],
@@ -179,6 +225,7 @@ export default function SellerRegisterPage() {
               </label>
             ))}
             <p className="text-xs text-ink/50">
+              After login you must accept category Terms & Conditions before KYC.
               We’ll email a verification code (requires Resend secrets).
             </p>
           </>

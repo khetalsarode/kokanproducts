@@ -46,6 +46,7 @@ type AuthContextValue = {
     businessAddress?: string;
     gstin?: string;
     fssaiLicense?: string;
+    businessCategoryId?: string;
     channel?: "email" | "phone";
     verificationToken?: string;
   }) => Promise<string | null>;
@@ -123,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       businessAddress?: string;
       gstin?: string;
       fssaiLicense?: string;
+      businessCategoryId?: string;
       channel?: "email" | "phone";
       verificationToken?: string;
     }) => {
