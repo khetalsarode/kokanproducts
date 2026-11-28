@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       businessAddress?: string;
       gstin?: string;
       fssaiLicense?: string;
+      businessCategoryId?: string;
       channel?: string;
       verificationToken?: string;
     };
@@ -154,6 +155,25 @@ export async function POST(request: Request) {
     if (wantSeller && !(body.shopName ?? "").trim()) {
       return NextResponse.json({ error: "Enter your shop name." }, { status: 400 });
     }
+    const businessCategoryId = (body.businessCategoryId ?? "").trim();
+    if (wantSeller) {
+      if (!businessCategoryId) {
+        return NextResponse.json(
+          { error: "Select your business category." },
+          { status: 400 },
+        );
+      }
+      const cats = await sql<{ id: string }>(
+        `select id from business_categories where id = $1 and active = true`,
+        [businessCategoryId],
+      );
+      if (!cats[0]) {
+        return NextResponse.json(
+          { error: "Invalid business category." },
+          { status: 400 },
+        );
+      }
+    }
     if (await getUserByEmail(email)) {
       return NextResponse.json(
         { error: "An account with this email already exists." },
@@ -178,8 +198,8 @@ export async function POST(request: Request) {
       await sql(
         `insert into seller_profiles
            (user_id, shop_name, location, bio, approved, registration_status,
-            business_address, gstin, fssai_license)
-         values ($1, $2, $3, $4, false, 'pending', $5, $6, $7)`,
+            business_address, gstin, fssai_license, business_category_id, kyc_status)
+         values ($1, $2, $3, $4, false, 'pending', $5, $6, $7, $8, 'locked')`,
         [
           id,
           (body.shopName ?? "").trim(),
@@ -188,7 +208,13 @@ export async function POST(request: Request) {
           (body.businessAddress ?? "").trim(),
           (body.gstin ?? "").trim(),
           (body.fssaiLicense ?? "").trim(),
+          businessCategoryId,
         ],
+      );
+      await sql(
+        `insert into seller_kyc (seller_user_id, status) values ($1, 'locked')
+         on conflict (seller_user_id) do nothing`,
+        [id],
       );
     }
 

@@ -135,6 +135,45 @@ export default function AdminPage() {
     description: "",
   });
   const [food, setFood] = useState<FoodInventoryFields>(emptyFoodFields());
+  const [agreementData, setAgreementData] = useState<{
+    categories: { id: string; name: string }[];
+    agreements: {
+      id: string;
+      categoryId: string;
+      version: number;
+      title: string;
+      content: string;
+      status: string;
+      publishedAt?: string;
+    }[];
+    acceptances: {
+      id: string;
+      sellerName: string;
+      sellerEmail: string;
+      shopName?: string | null;
+      categoryName: string;
+      agreementVersion: number;
+      acceptedAt: string;
+    }[];
+    pendingSellers: {
+      userId: string;
+      name: string;
+      email: string;
+      shopName: string;
+      categoryName: string | null;
+      publishedVersion: number | null;
+    }[];
+  } | null>(null);
+  const [agreementForm, setAgreementForm] = useState({
+    categoryId: "food-restaurant",
+    title: "",
+    content: "",
+    publish: true,
+  });
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    description: "",
+  });
 
   useEffect(() => {
     if (!ready) return;
@@ -144,6 +183,15 @@ export default function AdminPage() {
     }
     if (customer.role !== "admin") router.replace("/");
   }, [ready, customer, router]);
+
+  const loadAgreements = useCallback(async () => {
+    const res = await fetch("/api/admin/agreements", { cache: "no-store" });
+    if (res.ok) {
+      setAgreementData(
+        (await res.json()) as NonNullable<typeof agreementData>,
+      );
+    }
+  }, []);
 
   const load = useCallback(async () => {
     const [a, o, p, u, r] = await Promise.all([
@@ -158,11 +206,61 @@ export default function AdminPage() {
     if (p.ok) setProducts(((await p.json()) as { products: Product[] }).products);
     if (u.ok) setUsers(((await u.json()) as { users: AdminUser[] }).users);
     if (r.ok) setRequests(((await r.json()) as { requests: ProductRequest[] }).requests);
-  }, [range]);
+    await loadAgreements();
+  }, [range, loadAgreements]);
 
   useEffect(() => {
     if (customer?.role === "admin") void load();
   }, [customer, load]);
+
+  async function saveAgreement(e: FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/admin/agreements", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(agreementForm),
+    });
+    setMsg(res.ok ? "Agreement saved." : "Could not save agreement.");
+    if (res.ok) {
+      setAgreementForm((f) => ({ ...f, title: "", content: "" }));
+      await loadAgreements();
+    }
+  }
+
+  async function setAgreementStatus(id: string, status: "published" | "inactive" | "draft") {
+    const res = await fetch("/api/admin/agreements", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, status }),
+    });
+    setMsg(res.ok ? "Agreement updated." : "Could not update agreement.");
+    await loadAgreements();
+  }
+
+  async function saveCategory(e: FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/admin/agreements", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "create_category",
+        name: categoryForm.name,
+        description: categoryForm.description,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      categoryId?: string;
+    };
+    setMsg(res.ok ? `Category “${categoryForm.name}” saved.` : data.error || "Could not save category.");
+    if (res.ok) {
+      setCategoryForm({ name: "", description: "" });
+      if (data.categoryId) {
+        setAgreementForm((f) => ({ ...f, categoryId: data.categoryId! }));
+      }
+      await loadAgreements();
+    }
+  }
 
   const pendingSellers = useMemo(
     () =>
@@ -302,6 +400,11 @@ export default function AdminPage() {
         },
         { id: "products", label: "Catalogue" },
         { id: "inventory", label: "Warehouse & shelf life" },
+        {
+          id: "agreements",
+          label: "Agreements",
+          badge: agreementData?.pendingSellers.length,
+        },
         { id: "orders", label: "Orders" },
         { id: "reports", label: "Sales reports" },
       ]}
@@ -842,6 +945,229 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === "agreements" && (
+        <div className="space-y-6">
+          <form
+            onSubmit={saveCategory}
+            className="grid gap-3 rounded-xl border border-sea/15 bg-white/60 p-4 sm:grid-cols-2"
+          >
+            <h2 className="font-display text-xl sm:col-span-2">Add business category</h2>
+            <p className="text-sm text-ink/55 sm:col-span-2">
+              New categories appear on seller registration. Publish a Terms & Conditions
+              version for each category before sellers can accept and open KYC.
+            </p>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink/70">Category name</span>
+              <input
+                className="field"
+                value={categoryForm.name}
+                onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                placeholder="e.g. Homestays"
+                required
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink/70">Description</span>
+              <input
+                className="field"
+                value={categoryForm.description}
+                onChange={(e) =>
+                  setCategoryForm({ ...categoryForm, description: e.target.value })
+                }
+                placeholder="Short description for sellers"
+              />
+            </label>
+            <button type="submit" className="btn-primary w-fit sm:col-span-2">
+              Save category
+            </button>
+          </form>
+
+          <form
+            onSubmit={saveAgreement}
+            className="grid gap-3 rounded-xl border border-sea/15 bg-white/60 p-4"
+          >
+            <h2 className="font-display text-xl">Create / publish agreement</h2>
+            <p className="text-sm text-ink/55">
+              Publishing a new version retires the previous published agreement for that
+              category. Sellers must accept the latest version before KYC.
+            </p>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink/70">Business category</span>
+              <select
+                className="field"
+                value={agreementForm.categoryId}
+                onChange={(e) =>
+                  setAgreementForm({ ...agreementForm, categoryId: e.target.value })
+                }
+              >
+                {(agreementData?.categories || []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink/70">Title</span>
+              <input
+                className="field"
+                value={agreementForm.title}
+                onChange={(e) =>
+                  setAgreementForm({ ...agreementForm, title: e.target.value })
+                }
+                required
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink/70">Agreement content</span>
+              <textarea
+                className="field"
+                rows={10}
+                value={agreementForm.content}
+                onChange={(e) =>
+                  setAgreementForm({ ...agreementForm, content: e.target.value })
+                }
+                required
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={agreementForm.publish}
+                onChange={(e) =>
+                  setAgreementForm({ ...agreementForm, publish: e.target.checked })
+                }
+              />
+              Publish immediately
+            </label>
+            <button type="submit" className="btn-primary w-fit">
+              Save agreement
+            </button>
+          </form>
+
+          <div className="dash-table-wrap">
+            <h2 className="mb-3 font-display text-xl">Agreement versions</h2>
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Version</th>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(agreementData?.agreements || []).map((a) => (
+                  <tr key={a.id}>
+                    <td>
+                      {agreementData?.categories.find((c) => c.id === a.categoryId)?.name ||
+                        a.categoryId}
+                    </td>
+                    <td>v{a.version}</td>
+                    <td className="text-sm">{a.title}</td>
+                    <td>
+                      <StatusBadge
+                        status={
+                          a.status === "published"
+                            ? "approved"
+                            : a.status === "draft"
+                              ? "pending"
+                              : "inactive"
+                        }
+                        label={a.status}
+                      />
+                    </td>
+                    <td className="space-x-2 text-xs">
+                      {a.status !== "published" && (
+                        <button
+                          type="button"
+                          className="font-semibold text-sea"
+                          onClick={() => void setAgreementStatus(a.id, "published")}
+                        >
+                          Publish
+                        </button>
+                      )}
+                      {a.status === "published" && (
+                        <button
+                          type="button"
+                          className="font-semibold text-spice"
+                          onClick={() => void setAgreementStatus(a.id, "inactive")}
+                        >
+                          Deactivate
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="dash-table-wrap">
+            <h2 className="mb-3 font-display text-xl">Sellers missing latest acceptance</h2>
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Seller</th>
+                  <th>Shop</th>
+                  <th>Category</th>
+                  <th>Published version</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(agreementData?.pendingSellers || []).map((s) => (
+                  <tr key={s.userId}>
+                    <td>
+                      <p className="font-medium">{s.name}</p>
+                      <p className="text-xs text-ink/45">{s.email}</p>
+                    </td>
+                    <td>{s.shopName}</td>
+                    <td>{s.categoryName || "—"}</td>
+                    <td>{s.publishedVersion ? `v${s.publishedVersion}` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!agreementData?.pendingSellers.length && (
+              <div className="dash-empty">All sellers with categories have accepted the latest agreement.</div>
+            )}
+          </div>
+
+          <div className="dash-table-wrap">
+            <h2 className="mb-3 font-display text-xl">Acceptance history</h2>
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Seller</th>
+                  <th>Category</th>
+                  <th>Version</th>
+                  <th>Accepted at</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(agreementData?.acceptances || []).map((a) => (
+                  <tr key={a.id}>
+                    <td>
+                      <p className="font-medium">{a.sellerName}</p>
+                      <p className="text-xs text-ink/45">
+                        {a.sellerEmail}
+                        {a.shopName ? ` · ${a.shopName}` : ""}
+                      </p>
+                    </td>
+                    <td>{a.categoryName}</td>
+                    <td>v{a.agreementVersion}</td>
+                    <td className="text-xs">
+                      {new Date(a.acceptedAt).toLocaleString("en-IN")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

@@ -30,6 +30,30 @@ import type { Order, OrderStatus, Product } from "@/types";
 
 type Range = "day" | "week" | "month" | "year";
 
+type OnboardingState = {
+  categoryId: string | null;
+  categoryName: string | null;
+  agreement: {
+    id: string;
+    version: number;
+    title: string;
+    content: string;
+  } | null;
+  acceptanceStatus: "pending" | "accepted" | "outdated" | "no_category" | "no_agreement";
+  acceptedAt?: string;
+  acceptedVersion?: number;
+  kycStatus: string;
+  canAccessKyc: boolean;
+};
+
+type KycForm = {
+  status: string;
+  legalName: string;
+  businessPan: string;
+  documentNotes: string;
+  rejectionReason: string;
+};
+
 type ProductRequest = {
   id: string;
   requestType: "create" | "update";
@@ -103,6 +127,16 @@ export default function SellerPage() {
     description: "",
   });
   const [food, setFood] = useState<FoodInventoryFields>(emptyFoodFields());
+  const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
+  const [kyc, setKyc] = useState<KycForm>({
+    status: "locked",
+    legalName: "",
+    businessPan: "",
+    documentNotes: "",
+    rejectionReason: "",
+  });
+  const [agreeChecked, setAgreeChecked] = useState(false);
+  const [agreeBusy, setAgreeBusy] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
@@ -116,6 +150,29 @@ export default function SellerPage() {
   }, [ready, customer, router]);
 
   const approved = customer?.shopApproved !== false;
+  const needsAgreement =
+    onboarding != null &&
+    (onboarding.acceptanceStatus === "pending" ||
+      onboarding.acceptanceStatus === "outdated" ||
+      onboarding.acceptanceStatus === "no_category");
+
+  const loadOnboarding = useCallback(async () => {
+    const res = await fetch("/api/seller/onboarding", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = (await res.json()) as {
+      onboarding: OnboardingState;
+      kyc: KycForm;
+    };
+    setOnboarding(data.onboarding);
+    setKyc(data.kyc);
+    if (
+      data.onboarding.acceptanceStatus === "pending" ||
+      data.onboarding.acceptanceStatus === "outdated"
+    ) {
+      setTab("agreement");
+      setAgreeChecked(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     const [p, o, r] = await Promise.all([
@@ -130,11 +187,88 @@ export default function SellerPage() {
       const a = await fetch(`/api/seller/analytics?range=${range}`, { cache: "no-store" });
       if (a.ok) setAnalytics((await a.json()) as SellerAnalytics);
     }
-  }, [range, approved]);
+    await loadOnboarding();
+  }, [range, approved, loadOnboarding]);
 
   useEffect(() => {
     if (customer?.role === "seller" || customer?.role === "admin") void load();
   }, [customer, load]);
+
+  function navigateTab(next: string) {
+    if (next === "kyc" && onboarding && !onboarding.canAccessKyc) {
+      setMsg("Accept the current Terms & Conditions before opening KYC.");
+      setTab("agreement");
+      return;
+    }
+    if (
+      needsAgreement &&
+      next !== "agreement" &&
+      (onboarding?.acceptanceStatus === "pending" ||
+        onboarding?.acceptanceStatus === "outdated")
+    ) {
+      setMsg("You must accept the Terms & Conditions before continuing onboarding.");
+      setTab("agreement");
+      return;
+    }
+    setTab(next);
+  }
+
+  async function acceptAgreement() {
+    if (!onboarding?.agreement || !agreeChecked) {
+      setMsg("Tick “I Agree & Accept” to continue.");
+      return;
+    }
+    setAgreeBusy(true);
+    const res = await fetch("/api/seller/agreement/accept", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        agreementId: onboarding.agreement.id,
+        accepted: true,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      onboarding?: OnboardingState;
+    };
+    setAgreeBusy(false);
+    if (!res.ok) {
+      setMsg(data.error || "Could not record acceptance.");
+      return;
+    }
+    setOnboarding(data.onboarding || null);
+    setMsg("Terms accepted. You can continue with KYC registration.");
+    setTab("kyc");
+    await loadOnboarding();
+  }
+
+  async function submitKyc(e: FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/seller/kyc", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        legalName: kyc.legalName,
+        businessPan: kyc.businessPan,
+        documentNotes: kyc.documentNotes,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      setMsg(data.error || "Could not submit KYC.");
+      if (res.status === 403) setTab("agreement");
+      return;
+    }
+    setMsg("KYC submitted for review.");
+    await loadOnboarding();
+  }
+
+  const agreementStatusLabel =
+    onboarding?.acceptanceStatus === "accepted"
+      ? "Accepted"
+      : onboarding?.acceptanceStatus === "outdated"
+        ? "New Agreement Available"
+        : "Pending Acceptance";
 
   const pendingCount = useMemo(
     () => requests.filter((r) => r.status === "pending").length,
@@ -212,7 +346,7 @@ export default function SellerPage() {
       title="Seller workspace"
       subtitle={`${customer.shopName || customer.name} — products, orders, and performance`}
       active={tab}
-      onNavigate={setTab}
+      onNavigate={navigateTab}
       onLogout={() => void logout()}
       topRight={
         approved ? (
@@ -230,6 +364,12 @@ export default function SellerPage() {
       }
       nav={[
         { id: "overview", label: "Overview" },
+        {
+          id: "agreement",
+          label: "Terms & Conditions",
+          badge: needsAgreement ? 1 : undefined,
+        },
+        { id: "kyc", label: "KYC registration" },
         { id: "products", label: "My products" },
         { id: "inventory", label: "Warehouse & shelf life" },
         { id: "submit", label: "Submit product" },
@@ -259,6 +399,151 @@ export default function SellerPage() {
         <p className="mb-4 rounded-xl border border-lagoon/20 bg-lagoon/5 px-3 py-2 text-sm text-ink/70">
           {msg}
         </p>
+      )}
+
+      {onboarding && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-sea/15 bg-white/50 px-4 py-3 text-sm">
+          <span className="text-ink/55">Business category:</span>
+          <strong>{onboarding.categoryName || "Not set"}</strong>
+          <span className="text-ink/55">Agreement:</span>
+          <StatusBadge
+            status={
+              onboarding.acceptanceStatus === "accepted"
+                ? "approved"
+                : onboarding.acceptanceStatus === "outdated"
+                  ? "pending"
+                  : "pending"
+            }
+            label={agreementStatusLabel}
+          />
+          {onboarding.acceptedVersion ? (
+            <span className="text-xs text-ink/45">v{onboarding.acceptedVersion}</span>
+          ) : null}
+        </div>
+      )}
+
+      {tab === "agreement" && (
+        <div className="space-y-4">
+          {!onboarding?.agreement ? (
+            <div className="dash-empty">
+              {onboarding?.acceptanceStatus === "no_category"
+                ? "No business category on your profile. Contact admin or re-register with a category."
+                : "No published agreement for your category yet."}
+            </div>
+          ) : (
+            <>
+              <div className="rounded-xl border border-sea/15 bg-white/70 p-4">
+                <h2 className="font-display text-2xl text-ink">
+                  {onboarding.agreement.title}
+                </h2>
+                <p className="mt-1 text-sm text-ink/55">
+                  {onboarding.categoryName} · Version {onboarding.agreement.version}
+                  {onboarding.acceptanceStatus === "outdated"
+                    ? " — a newer version requires your acceptance"
+                    : null}
+                </p>
+                <pre className="mt-4 max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-lg bg-foam/80 p-4 text-sm leading-relaxed text-ink/80">
+                  {onboarding.agreement.content}
+                </pre>
+              </div>
+              {onboarding.acceptanceStatus === "accepted" ? (
+                <p className="text-sm text-lagoon">
+                  You accepted this agreement
+                  {onboarding.acceptedAt
+                    ? ` on ${new Date(onboarding.acceptedAt).toLocaleString("en-IN")}`
+                    : ""}
+                  .
+                </p>
+              ) : (
+                <div className="space-y-3 rounded-xl border border-spice/20 bg-spice/5 p-4">
+                  <p className="text-sm text-ink/70">
+                    Acceptance is mandatory and cannot be skipped. KYC stays locked until you
+                    agree.
+                  </p>
+                  <label className="flex items-start gap-2 text-sm text-ink/80">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={agreeChecked}
+                      onChange={(e) => setAgreeChecked(e.target.checked)}
+                    />
+                    <span>
+                      I have read and agree to the Terms & Conditions for{" "}
+                      <strong>{onboarding.categoryName}</strong>.
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={!agreeChecked || agreeBusy}
+                    onClick={() => void acceptAgreement()}
+                  >
+                    {agreeBusy ? "Saving…" : "I Agree & Accept"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {tab === "kyc" && (
+        <div className="space-y-4">
+          {!onboarding?.canAccessKyc ? (
+            <div className="rounded-xl border border-spice/25 bg-spice/5 px-4 py-3 text-sm text-ink/75">
+              KYC registration is locked until you accept the current Terms & Conditions for your
+              business category.
+              <button
+                type="button"
+                className="ml-2 font-medium text-sea hover:underline"
+                onClick={() => setTab("agreement")}
+              >
+                Review agreement
+              </button>
+            </div>
+          ) : (
+            <form
+              onSubmit={submitKyc}
+              className="grid max-w-xl gap-3 rounded-xl border border-sea/15 bg-white/70 p-4"
+            >
+              <h2 className="font-display text-2xl text-ink">KYC registration</h2>
+              <p className="text-sm text-ink/55">
+                Status: <strong>{kyc.status}</strong>
+                {kyc.rejectionReason ? ` — ${kyc.rejectionReason}` : ""}
+              </p>
+              <label className="grid gap-1 text-sm">
+                <span className="text-ink/70">Legal business name</span>
+                <input
+                  className="field"
+                  value={kyc.legalName}
+                  onChange={(e) => setKyc({ ...kyc, legalName: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="text-ink/70">PAN / tax ID</span>
+                <input
+                  className="field"
+                  value={kyc.businessPan}
+                  onChange={(e) => setKyc({ ...kyc, businessPan: e.target.value })}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="text-ink/70">Document notes</span>
+                <textarea
+                  className="field"
+                  rows={3}
+                  value={kyc.documentNotes}
+                  onChange={(e) => setKyc({ ...kyc, documentNotes: e.target.value })}
+                  placeholder="List documents you will upload / share for verification"
+                />
+              </label>
+              <button type="submit" className="btn-primary w-fit">
+                Submit KYC
+              </button>
+            </form>
+          )}
+        </div>
       )}
 
       {tab === "overview" && (
